@@ -1,19 +1,28 @@
 
 /*
  * TRADE AI
- * Gestor de riesgo v3.0
+ * Gestor de riesgo v4.0
  * Solo simulación.
+ *
+ * Configuración:
+ * - Capital inicial: $100
+ * - Apalancamiento: 1:30
+ * - Objetivo neto por ciclo: +$0.20
+ * - Pérdida máxima por ciclo: -$5.00
+ *
+ * Los límites son cantidades fijas en USD,
+ * no porcentajes del capital.
  */
 
 const TradeRisk = (() => {
 
-    function createManager() {
+    const CONFIG = {
+        profitTargetUSD: 0.20,
+        maxLossUSD: 5.00,
+        leverage: 30
+    };
 
-        const CONFIG = {
-            profitTarget: 0.002,
-            maxLoss: 0.05,
-            leverage: 30
-        };
+    function createManager() {
 
         let cycleStartBalance = 100;
         let cycleProfitLoss = 0;
@@ -33,8 +42,12 @@ const TradeRisk = (() => {
             return getStatus();
         }
 
-        // Actualizar el resultado total del ciclo.
-        // Incluye operaciones cerradas y pérdidas/ganancias abiertas.
+        /*
+         * Actualiza el resultado neto total del ciclo.
+         * Incluye P/L realizado, flotante y resultados
+         * manuales registrados por el motor.
+         */
+
         function updateCycleProfitLoss(totalProfitLoss) {
 
             if (!Number.isFinite(totalProfitLoss)) {
@@ -52,8 +65,11 @@ const TradeRisk = (() => {
             return getStatus();
         }
 
-        // Registrar un resultado adicional.
-        // Se conserva para las pruebas manuales.
+        /*
+         * Registrar un resultado adicional.
+         * Se conserva para las pruebas manuales.
+         */
+
         function recordTrade(profitLoss) {
 
             if (cycleStatus !== "ACTIVE") {
@@ -71,18 +87,20 @@ const TradeRisk = (() => {
             return getStatus();
         }
 
-        // Comprobar los límites del ciclo.
+        /*
+         * Comprobar límites fijos del ciclo.
+         */
+
         function checkLimits() {
 
-            const target =
-                cycleStartBalance * CONFIG.profitTarget;
-
-            const limit =
-                cycleStartBalance * CONFIG.maxLoss;
-
-            if (cycleProfitLoss >= target) {
+            if (
+                cycleProfitLoss >= CONFIG.profitTargetUSD
+            ) {
                 cycleStatus = "TAKE_PROFIT";
-            } else if (cycleProfitLoss <= -limit) {
+
+            } else if (
+                cycleProfitLoss <= -CONFIG.maxLossUSD
+            ) {
                 cycleStatus = "LOSS_LIMIT";
             }
         }
@@ -90,41 +108,53 @@ const TradeRisk = (() => {
         function getStatus() {
 
             const profitTarget =
-                cycleStartBalance * CONFIG.profitTarget;
+                CONFIG.profitTargetUSD;
 
             const lossLimit =
-                cycleStartBalance * CONFIG.maxLoss;
+                CONFIG.maxLossUSD;
 
             const currentBalance =
                 cycleStartBalance + cycleProfitLoss;
 
             let action = "CONTINUE";
 
-            if (cycleStatus === "TAKE_PROFIT") {
+            if (
+                cycleStatus === "TAKE_PROFIT" ||
+                cycleStatus === "LOSS_LIMIT"
+            ) {
                 action = "CLOSE_ALL_AND_WAIT";
-            }
-
-            if (cycleStatus === "LOSS_LIMIT") {
-                action = "CLOSE_ALL_AND_RESTART";
             }
 
             return {
                 cycleNumber,
                 cycleStatus,
                 action,
+
                 startingBalance: cycleStartBalance,
                 currentBalance,
                 cycleProfitLoss,
+
                 profitTarget,
                 lossLimit,
+
                 profitProgress:
                     (cycleProfitLoss / profitTarget) * 100,
+
                 lossProgress:
-                    (Math.abs(Math.min(0, cycleProfitLoss)) /
-                    lossLimit) * 100,
+                    (
+                        Math.abs(
+                            Math.min(0, cycleProfitLoss)
+                        ) / lossLimit
+                    ) * 100,
+
                 leverage: CONFIG.leverage
             };
         }
+
+        /*
+         * Inicia un nuevo ciclo con el balance restante.
+         * El número de ciclo aumenta.
+         */
 
         function resetCycle(remainingBalance) {
 
@@ -146,10 +176,13 @@ const TradeRisk = (() => {
 
     return {
         createManager,
+
         startCycle: testManager.startCycle,
         recordTrade: testManager.recordTrade,
+
         updateCycleProfitLoss:
             testManager.updateCycleProfitLoss,
+
         getStatus: testManager.getStatus,
         resetCycle: testManager.resetCycle
     };
