@@ -5,19 +5,27 @@ const TradeEngine = (() => {
     let autoTimer = null;
     let autoProvider = null;
     let intervalSeconds = 10;
+
     let cyclePositionIds = new Set();
     let manualPL = 0;
-    let lifetimeManualWins = 0;
 
-let lifetimeManualLosses = 0;
+    let lifetimeManualWins = 0;
+    let lifetimeManualLosses = 0;
+
     let lastSignals = {};
     let decisionLog = [];
     let lastError = null;
     let lastCycleEndTime = 0;
     let cooldownMs = 30000;
 
-    const MAX_POSITIONS = 20;
-    const POSITION_FRACTION = 0.20;
+    // Protección global del ciclo.
+    // Al alcanzar un límite, deja de abrir operaciones nuevas,
+    // pero no cierra las que todavía están abiertas.
+    let cycleLimitReached = false;
+    let cycleLimitReason = null;
+
+    const MAX_POSITIONS = 10;
+    const POSITION_FRACTION = 0.10;
 
     function log(message, type = "info") {
         const entry = {
@@ -49,46 +57,58 @@ let lifetimeManualLosses = 0;
 
     function calculateCyclePL() {
         const openPL = getCurrentCyclePositions().reduce(
-            (total, position) => total + Number(position.profitLoss || 0),
+            (total, position) =>
+                total + Number(position.profitLoss || 0),
             0
         );
 
         const closedPL = getCurrentCycleHistory().reduce(
-            (total, position) => total + Number(position.profitLoss || 0),
+            (total, position) =>
+                total + Number(position.profitLoss || 0),
             0
         );
 
         return openPL + closedPL + manualPL;
     }
-function calculateAllTimeStats() {
-    const closed = PositionManager.getHistory();
-    const open = PositionManager.getOpenPositions();
 
-    const allPositions = [...closed, ...open];
+    function calculateAllTimeStats() {
+        const closed = PositionManager.getHistory();
+        const open = PositionManager.getOpenPositions();
 
-    const positionWins = allPositions.reduce(
-        (total, position) =>
-            total + Math.max(0, Number(position.profitLoss || 0)),
-        0
-    );
+        const allPositions = [...closed, ...open];
 
-    const positionLosses = allPositions.reduce(
-        (total, position) =>
-            total + Math.abs(Math.min(0, Number(position.profitLoss || 0))),
-        0
-    );
+        const positionWins = allPositions.reduce(
+            (total, position) =>
+                total + Math.max(
+                    0,
+                    Number(position.profitLoss || 0)
+                ),
+            0
+        );
 
-    const totalWins = positionWins + lifetimeManualWins;
-    const totalLosses = positionLosses + lifetimeManualLosses;
+        const positionLosses = allPositions.reduce(
+            (total, position) =>
+                total + Math.abs(
+                    Math.min(
+                        0,
+                        Number(position.profitLoss || 0)
+                    )
+                ),
+            0
+        );
 
-    return {
-        totalWins,
-        totalLosses,
-        netProfitLoss: totalWins - totalLosses,
-        closedTrades: closed.length,
-        openTrades: open.length
-    };
-}
+        const totalWins = positionWins + lifetimeManualWins;
+        const totalLosses = positionLosses + lifetimeManualLosses;
+
+        return {
+            totalWins,
+            totalLosses,
+            netProfitLoss: totalWins - totalLosses,
+            closedTrades: closed.length,
+            openTrades: open.length
+        };
+    }
+
     function getRiskStatus() {
         return risk ? risk.getStatus() : null;
     }
@@ -100,39 +120,70 @@ function calculateAllTimeStats() {
         }
     }
 
+    // Finaliza el ciclo solo cuando no quedan posiciones
+    // abiertas pertenecientes a ese ciclo.
     function finishCycle(reason) {
         if (!risk) return;
 
         const openPositions = getCurrentCyclePositions();
 
         if (openPositions.length > 0) {
-            PositionManager.closeAll(reason);
+            return;
         }
 
         const finalPL = calculateCyclePL();
+
+        // Actualizar el resultado definitivo del ciclo.
         risk.updateCycleProfitLoss(finalPL);
 
         engineStatus = "WAITING";
         lastCycleEndTime = Date.now();
 
         log(
-            `Ciclo finalizado: ${reason}. Resultado: ${finalPL.toFixed(2)}`,
+            `Ciclo finalizado: ${reason}. Resultado: ${finalPL.toFixed(4)}`,
             "warning"
         );
     }
 
+    // Comprueba los límites globales sin cerrar posiciones.
     function checkRiskLimits() {
         if (!risk || engineStatus !== "RUNNING") return;
 
         const totalPL = calculateCyclePL();
-        risk.updateCycleProfitLoss(totalPL);
-
         const status = risk.getStatus();
 
-        if (status.cycleStatus === "TAKE_PROFIT") {
-            finishCycle("TAKE_PROFIT");
-        } else if (status.cycleStatus === "LOSS_LIMIT") {
-            finishCycle("LOSS_LIMIT");
+        // Los límites se calculan sobre el balance inicial
+        // del ciclo, no sobre el margen de cada posición.
+        const profitTarget = Number(status.profitTarget);
+        const lossLimit = Number(status.lossLimit);
+
+        if (!cycleLimitReached) {
+            if (totalPL >= profitTarget) {
+                cycleLimitReached = true;
+                cycleLimitReason = "TAKE_PROFIT";
+
+                log(
+                    "Objetivo global alcanzado. No se abrirán nuevas posiciones. Las operaciones abiertas seguirán hasta su objetivo individual.",
+                    "success"
+                );
+            } else if (totalPL <= -lossLimit) {
+                cycleLimitReached = true;
+                cycleLimitReason = "LOSS_LIMIT";
+
+                log(
+                    "Límite global de pérdida alcanzado. No se abrirán nuevas posiciones. Las operaciones abiertas seguirán hasta su objetivo individual.",
+                    "warning"
+                );
+            }
+        }
+
+        // Solo finalizar cuando todas las posiciones del ciclo
+        // hayan cerrado individualmente.
+        if (
+            cycleLimitReached &&
+            getCurrentCyclePositions().length === 0
+        ) {
+            finishCycle(cycleLimitReason);
         }
     }
 
@@ -147,7 +198,10 @@ function calculateAllTimeStats() {
         const status = risk.getStatus();
         const remainingBalance = Number(status.currentBalance);
 
-        if (!Number.isFinite(remainingBalance) || remainingBalance <= 0) {
+        if (
+            !Number.isFinite(remainingBalance) ||
+            remainingBalance <= 0
+        ) {
             return {
                 success: false,
                 reason: "No queda capital disponible para iniciar otro ciclo."
@@ -155,8 +209,12 @@ function calculateAllTimeStats() {
         }
 
         PositionManager.reset(false);
+
         cyclePositionIds.clear();
         manualPL = 0;
+
+        cycleLimitReached = false;
+        cycleLimitReason = null;
 
         risk.resetCycle(remainingBalance);
 
@@ -190,16 +248,23 @@ function calculateAllTimeStats() {
         risk.startCycle(amount);
 
         PositionManager.reset(false);
-        cyclePositionIds.clear();
 
+        cyclePositionIds.clear();
         manualPL = 0;
+
+        cycleLimitReached = false;
+        cycleLimitReason = null;
+
         lastSignals = {};
         lastError = null;
 
         engineStatus = "RUNNING";
         lastCycleEndTime = 0;
 
-        log(`Motor iniciado con ${amount.toFixed(2)} de capital.`, "success");
+        log(
+            `Motor iniciado con ${amount.toFixed(2)} de capital.`,
+            "success"
+        );
 
         return {
             success: true,
@@ -245,9 +310,13 @@ function calculateAllTimeStats() {
             };
 
             if (!Number.isFinite(Number(analysis.price))) {
-                throw new Error("El análisis no devolvió un precio válido.");
+                throw new Error(
+                    "El análisis no devolvió un precio válido."
+                );
             }
 
+            // Actualizar precios y permitir que PositionManager
+            // cierre únicamente por sus propios límites.
             const closedPositions = PositionManager.updatePrice(
                 pair,
                 Number(analysis.price)
@@ -255,24 +324,35 @@ function calculateAllTimeStats() {
 
             closedPositions.forEach(position => {
                 log(
-                    `${pair}: posición cerrada con resultado ${Number(position.profitLoss).toFixed(2)}.`,
+                    `${pair}: posición cerrada con resultado ${Number(position.profitLoss).toFixed(4)}.`,
                     "info"
                 );
             });
 
             checkRiskLimits();
 
-            if (engineStatus !== "RUNNING") {
+            // Si se alcanzó el límite global, no abrir más.
+            // Las posiciones que queden abiertas siguen activas.
+            if (
+                engineStatus !== "RUNNING" ||
+                cycleLimitReached
+            ) {
                 return {
                     success: true,
                     analysis,
                     opened: false,
-                    reason: "Se alcanzó un límite del ciclo."
+                    reason: "Se alcanzó un límite global. Esperando el cierre individual de las posiciones."
                 };
             }
 
-            if (analysis.signal !== "BUY" && analysis.signal !== "SELL") {
-                log(`${pair}: sin señal de entrada.`, "info");
+            if (
+                analysis.signal !== "BUY" &&
+                analysis.signal !== "SELL"
+            ) {
+                log(
+                    `${pair}: sin señal de entrada.`,
+                    "info"
+                );
 
                 return {
                     success: true,
@@ -282,7 +362,9 @@ function calculateAllTimeStats() {
                 };
             }
 
-            if (getCurrentCyclePositions().length >= MAX_POSITIONS) {
+            if (
+                getCurrentCyclePositions().length >= MAX_POSITIONS
+            ) {
                 return {
                     success: true,
                     analysis,
@@ -291,9 +373,17 @@ function calculateAllTimeStats() {
                 };
             }
 
-            const balance = Number(risk.getStatus().currentBalance);
-            const reservedMargin = PositionManager.getTotalMargin();
-            const availableMargin = Math.max(0, balance - reservedMargin);
+            const balance = Number(
+                risk.getStatus().currentBalance
+            );
+
+            const reservedMargin =
+                PositionManager.getTotalMargin();
+
+            const availableMargin = Math.max(
+                0,
+                balance - reservedMargin
+            );
 
             const margin = Math.min(
                 balance * POSITION_FRACTION,
@@ -340,9 +430,14 @@ function calculateAllTimeStats() {
                 opened: true,
                 position: result.position
             };
+
         } catch (error) {
             lastError = error.message;
-            log(`Error analizando ${pair}: ${error.message}`, "error");
+
+            log(
+                `Error analizando ${pair}: ${error.message}`,
+                "error"
+            );
 
             return {
                 success: false,
@@ -355,32 +450,50 @@ function calculateAllTimeStats() {
         if (!autoProvider || !risk) return;
 
         if (engineStatus === "WAITING") {
-            const elapsed = Date.now() - lastCycleEndTime;
+            const elapsed =
+                Date.now() - lastCycleEndTime;
 
             if (elapsed < cooldownMs) return;
 
             let foundSignal = false;
 
             try {
-                const pairs = ["EUR/USD", "GBP/USD", "USD/JPY"];
+                const pairs = [
+                    "EUR/USD",
+                    "GBP/USD",
+                    "USD/JPY"
+                ];
 
                 for (const pair of pairs) {
                     const candles = autoProvider(pair);
                     const analysis = TradeAI.analyze(candles);
 
-                    if (analysis.signal === "BUY" || analysis.signal === "SELL") {
+                    if (
+                        analysis.signal === "BUY" ||
+                        analysis.signal === "SELL"
+                    ) {
                         foundSignal = true;
                         break;
                     }
                 }
+
             } catch (error) {
                 lastError = error.message;
-                log(`Error buscando nuevas condiciones: ${error.message}`, "error");
+
+                log(
+                    `Error buscando nuevas condiciones: ${error.message}`,
+                    "error"
+                );
+
                 return;
             }
 
             if (!foundSignal) {
-                log("Esperando condiciones adecuadas para reiniciar.", "info");
+                log(
+                    "Esperando condiciones adecuadas para reiniciar.",
+                    "info"
+                );
+
                 return;
             }
 
@@ -394,7 +507,11 @@ function calculateAllTimeStats() {
 
         if (engineStatus !== "RUNNING") return;
 
-        const pairs = ["EUR/USD", "GBP/USD", "USD/JPY"];
+        const pairs = [
+            "EUR/USD",
+            "GBP/USD",
+            "USD/JPY"
+        ];
 
         for (const pair of pairs) {
             if (engineStatus !== "RUNNING") break;
@@ -402,9 +519,14 @@ function calculateAllTimeStats() {
             try {
                 const candles = autoProvider(pair);
                 analyzePair(pair, candles);
+
             } catch (error) {
                 lastError = error.message;
-                log(`Error en el ciclo automático: ${error.message}`, "error");
+
+                log(
+                    `Error en el ciclo automático: ${error.message}`,
+                    "error"
+                );
             }
         }
     }
@@ -427,7 +549,10 @@ function calculateAllTimeStats() {
         stopAuto();
 
         autoProvider = provider;
-        intervalSeconds = Math.max(1, Number(seconds) || 10);
+        intervalSeconds = Math.max(
+            1,
+            Number(seconds) || 10
+        );
 
         runAnalysis();
 
@@ -472,13 +597,15 @@ function calculateAllTimeStats() {
         }
 
         manualPL += value;
-if (value >= 0) {
-    lifetimeManualWins += value;
-} else {
-    lifetimeManualLosses += Math.abs(value);
-}
+
+        if (value >= 0) {
+            lifetimeManualWins += value;
+        } else {
+            lifetimeManualLosses += Math.abs(value);
+        }
+
         log(
-            `Resultado simulado registrado: ${value.toFixed(2)}.`,
+            `Resultado simulado registrado: ${value.toFixed(4)}.`,
             "info"
         );
 
@@ -502,18 +629,29 @@ if (value >= 0) {
     }
 
     function getStatus() {
-        const openPositions = getCurrentCyclePositions();
-        const positionHistory = getCurrentCycleHistory();
+        const openPositions =
+            getCurrentCyclePositions();
+
+        const positionHistory =
+            getCurrentCycleHistory();
+
         const riskStatus = getRiskStatus();
-const allTimeStats = calculateAllTimeStats();
+        const allTimeStats = calculateAllTimeStats();
+
         return {
             engineStatus,
             isRunning: engineStatus === "RUNNING",
             isWaiting: engineStatus === "WAITING",
             isStopped: engineStatus === "STOPPED",
 
-            balance: riskStatus ? riskStatus.currentBalance : 0,
-            currentBalance: riskStatus ? riskStatus.currentBalance : 0,
+            balance: riskStatus
+                ? riskStatus.currentBalance
+                : 0,
+
+            currentBalance: riskStatus
+                ? riskStatus.currentBalance
+                : 0,
+
             cycleProfitLoss: calculateCyclePL(),
 
             risk: riskStatus,
@@ -523,15 +661,21 @@ const allTimeStats = calculateAllTimeStats();
 
             positionHistory,
             history: positionHistory,
+
             allHistory: PositionManager.getHistory(),
-allTimeStats,
+            allTimeStats,
+
             lastSignals,
             decisionLog,
             decisions: decisionLog,
 
             lastError,
+
             autoActive: autoTimer !== null,
-            intervalSeconds
+            intervalSeconds,
+
+            cycleLimitReached,
+            cycleLimitReason
         };
     }
 
