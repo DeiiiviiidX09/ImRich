@@ -173,3 +173,6 @@ const TradeAI = (() => {
   };
 
 })();
+
+// Hacer el motor accesible desde toda la aplicación
+window.TradeAI = TradeAI;
