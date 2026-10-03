@@ -404,13 +404,16 @@ if (
         intervalSeconds = 10
     ) {
 
-        if (engineStatus !== "RUNNING") {
+       if (engineStatus === "RUNNING") {
 
-            return {
-                success: false,
-                reason: "Primero debes iniciar el motor."
-            };
-        }
+    analyzePair(pair, candles);
+
+    // Si se cerró un ciclo, terminar esta ronda
+    if (cycleEndedThisRun) {
+        break;
+    }
+
+}
 
         if (typeof candleProvider !== "function") {
 
