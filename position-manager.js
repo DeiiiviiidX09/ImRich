@@ -1,7 +1,7 @@
 
 /*
  * TRADE AI
- * Gestor de posiciones v1.0
+ * Gestor de posiciones v1.1
  * Simulación exclusivamente.
  * No ejecuta órdenes reales.
  */
@@ -18,10 +18,17 @@ const PositionManager = (() => {
         stopLossPercent: 20
     };
 
+    // Contar solamente las posiciones abiertas
+    function countOpenPositions() {
+        return positions.filter(
+            position => position.status === "OPEN"
+        ).length;
+    }
+
     // Abrir una posición simulada
     function openPosition(pair, direction, amount, price) {
 
-        if (positions.length >= CONFIG.maxPositions) {
+        if (countOpenPositions() >= CONFIG.maxPositions) {
             return {
                 success: false,
                 reason: "Se alcanzó el máximo de posiciones abiertas."
@@ -42,6 +49,19 @@ const PositionManager = (() => {
             };
         }
 
+        const alreadyOpen = positions.some(
+            position =>
+                position.pair === pair &&
+                position.status === "OPEN"
+        );
+
+        if (alreadyOpen) {
+            return {
+                success: false,
+                reason: "Ya existe una posición abierta en este par."
+            };
+        }
+
         const position = {
             id: nextId++,
             pair,
@@ -52,7 +72,9 @@ const PositionManager = (() => {
             currentPrice: price,
             profitLoss: 0,
             status: "OPEN",
-            openedAt: new Date().toISOString()
+            openedAt: new Date().toISOString(),
+            closedAt: null,
+            closeReason: null
         };
 
         positions.push(position);
@@ -61,6 +83,40 @@ const PositionManager = (() => {
             success: true,
             position: { ...position }
         };
+    }
+
+    // Calcular el resultado de una posición
+    function calculateProfitLoss(position, price) {
+
+        let movement;
+
+        if (position.direction === "BUY") {
+            movement =
+                (price - position.entryPrice) /
+                position.entryPrice;
+        } else {
+            movement =
+                (position.entryPrice - price) /
+                position.entryPrice;
+        }
+
+        return (
+            position.margin *
+            movement *
+            position.leverage
+        );
+    }
+
+    // Cerrar una posición
+    function closePosition(position, reason) {
+
+        if (position.status !== "OPEN") {
+            return;
+        }
+
+        position.status = "CLOSED";
+        position.closeReason = reason;
+        position.closedAt = new Date().toISOString();
     }
 
     // Actualizar precio y comprobar salida
@@ -83,24 +139,8 @@ const PositionManager = (() => {
 
             position.currentPrice = price;
 
-            let movement;
-
-            if (position.direction === "BUY") {
-                movement =
-                    (price - position.entryPrice) /
-                    position.entryPrice;
-            } else {
-                movement =
-                    (position.entryPrice - price) /
-                    position.entryPrice;
-            }
-
-            // El apalancamiento amplifica el resultado
-            const pnlPercent =
-                movement * position.leverage * 100;
-
             position.profitLoss =
-                position.margin * pnlPercent / 100;
+                calculateProfitLoss(position, price);
 
             const profitTarget =
                 position.margin *
@@ -124,14 +164,6 @@ const PositionManager = (() => {
         });
 
         return closed;
-    }
-
-    // Cerrar una posición
-    function closePosition(position, reason) {
-
-        position.status = "CLOSED";
-        position.closeReason = reason;
-        position.closedAt = new Date().toISOString();
     }
 
     // Cerrar todas las posiciones abiertas
@@ -160,10 +192,12 @@ const PositionManager = (() => {
             .map(position => ({ ...position }));
     }
 
-    // Consultar historial
+    // Consultar solamente el historial cerrado
     function getHistory() {
 
-        return positions.map(position => ({ ...position }));
+        return positions
+            .filter(position => position.status === "CLOSED")
+            .map(position => ({ ...position }));
     }
 
     // Consultar exposición total
@@ -189,6 +223,7 @@ const PositionManager = (() => {
         getOpenPositions,
         getHistory,
         getTotalMargin,
+        countOpenPositions,
         reset
     };
 
