@@ -1,7 +1,7 @@
 
 /*
  * TRADE AI
- * Gestor de riesgo v2.0
+ * Gestor de riesgo v3.0
  * Solo simulación.
  */
 
@@ -33,6 +33,27 @@ const TradeRisk = (() => {
             return getStatus();
         }
 
+        // Actualizar el resultado total del ciclo.
+        // Incluye operaciones cerradas y pérdidas/ganancias abiertas.
+        function updateCycleProfitLoss(totalProfitLoss) {
+
+            if (!Number.isFinite(totalProfitLoss)) {
+                throw new Error("Resultado no válido.");
+            }
+
+            if (cycleStatus !== "ACTIVE") {
+                return getStatus();
+            }
+
+            cycleProfitLoss = totalProfitLoss;
+
+            checkLimits();
+
+            return getStatus();
+        }
+
+        // Registrar un resultado adicional.
+        // Se conserva para las pruebas manuales.
         function recordTrade(profitLoss) {
 
             if (cycleStatus !== "ACTIVE") {
@@ -45,6 +66,14 @@ const TradeRisk = (() => {
 
             cycleProfitLoss += profitLoss;
 
+            checkLimits();
+
+            return getStatus();
+        }
+
+        // Comprobar los límites del ciclo.
+        function checkLimits() {
+
             const target =
                 cycleStartBalance * CONFIG.profitTarget;
 
@@ -56,8 +85,6 @@ const TradeRisk = (() => {
             } else if (cycleProfitLoss <= -limit) {
                 cycleStatus = "LOSS_LIMIT";
             }
-
-            return getStatus();
         }
 
         function getStatus() {
@@ -109,18 +136,20 @@ const TradeRisk = (() => {
         return {
             startCycle,
             recordTrade,
+            updateCycleProfitLoss,
             getStatus,
             resetCycle
         };
     }
 
-    // Instancia independiente para las pruebas manuales
     const testManager = createManager();
 
     return {
         createManager,
         startCycle: testManager.startCycle,
         recordTrade: testManager.recordTrade,
+        updateCycleProfitLoss:
+            testManager.updateCycleProfitLoss,
         getStatus: testManager.getStatus,
         resetCycle: testManager.resetCycle
     };
