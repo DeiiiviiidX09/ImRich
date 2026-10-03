@@ -1,14 +1,14 @@
 
 /*
  * TRADE AI
- * Motor autónomo v6.0
+ * Motor autónomo v7.0
  *
  * Simulación exclusivamente.
  * No ejecuta órdenes reales ni se conecta a un broker.
  *
  * Configuración:
  * - Capital inicial: $100
- * - Margen por operación: 100% del capital disponible
+ * - Margen por operación: 100% del balance disponible
  * - Apalancamiento: 1:30
  * - Exposición inicial: $3,000
  * - Máximo de posiciones simultáneas: 1
@@ -178,12 +178,17 @@ const TradeEngine = (() => {
         const openPositions = getCurrentCyclePositions();
 
         /*
-         * Cierra las posiciones abiertas al finalizar
-         * el ciclo y conserva el resultado calculado.
+         * Cierra solamente las posiciones pertenecientes
+         * al ciclo actual.
          */
 
         if (openPositions.length > 0) {
-            PositionManager.closeAll(reason);
+
+            const ids = openPositions.map(
+                position => position.id
+            );
+
+            PositionManager.closePositions(ids, reason);
         }
 
         const finalPL = calculateCyclePL();
@@ -429,9 +434,10 @@ const TradeEngine = (() => {
                 };
             }
 
-            // 4. No permitir más de una posición abierta.
-            // Se comprueban todas las posiciones del gestor,
-            // no solamente las del ciclo actual.
+            /*
+             * 4. Comprobar que no exista ninguna posición
+             * abierta en el gestor.
+             */
 
             const allOpenPositions =
                 PositionManager.getOpenPositions();
@@ -445,7 +451,7 @@ const TradeEngine = (() => {
                 };
             }
 
-            // 5. Obtener el balance disponible del ciclo.
+            // 5. Obtener el balance actual del ciclo.
 
             const riskStatus = risk.getStatus();
 
@@ -466,13 +472,13 @@ const TradeEngine = (() => {
             }
 
             /*
-             * UTILIZAR EL 100% DEL CAPITAL COMO MARGEN.
+             * 6. Utilizar el 100% del balance como margen.
              *
              * Ejemplo:
              * Balance: $100
              * Margen: $100
              * Apalancamiento: 30x
-             * Exposición esperada: $3,000
+             * Exposición: $3,000
              */
 
             const margin = balance * POSITION_FRACTION;
@@ -482,7 +488,7 @@ const TradeEngine = (() => {
                 "info"
             );
 
-            // 6. Abrir posición.
+            // 7. Abrir posición.
 
             const result = PositionManager.openPosition(
                 pair,
@@ -503,7 +509,7 @@ const TradeEngine = (() => {
             cyclePositionIds.add(result.position.id);
 
             log(
-                `Nueva posición ${analysis.signal} en ${pair}. Margen solicitado: ${margin.toFixed(4)} USD. Exposición registrada: ${Number(result.position.exposure || 0).toFixed(4)} USD.`,
+                `Nueva posición ${analysis.signal} en ${pair}. Margen: ${margin.toFixed(4)} USD. Exposición: ${Number(result.position.exposure || 0).toFixed(4)} USD.`,
                 "success"
             );
 
