@@ -159,13 +159,12 @@ const TradeEngine = (() => {
     // CONTROL DEL TEMPORIZADOR
     // --------------------------------------------------
 
-    function stopAuto() {
-
-        if (autoTimer !== null) {
-            clearInterval(autoTimer);
-            autoTimer = null;
-        }
+ function stopAuto() {
+    if (autoTimer !== null) {
+        clearTimeout(autoTimer);
+        autoTimer = null;
     }
+}
 
     // --------------------------------------------------
     // CIERRE DE CICLO
@@ -693,50 +692,92 @@ const TradeEngine = (() => {
     // ACTIVAR ANÁLISIS AUTOMÁTICO
     // --------------------------------------------------
 
-    function startAuto(provider, seconds = 10) {
+function startAuto(provider, seconds = 10) {
 
-        if (!risk) {
-            return {
-                success: false,
-                reason: "Primero debes iniciar el motor."
-            };
-        }
-
-        if (typeof provider !== "function") {
-            return {
-                success: false,
-                reason: "No se ha proporcionado una fuente de datos válida."
-            };
-        }
-
-        stopAuto();
-
-        autoProvider = provider;
-
-        intervalSeconds = Math.max(
-            1,
-            Number(seconds) || 10
-        );
-
-        // Ejecutar el primer análisis inmediatamente.
-        runAnalysis();
-
-        // Continuar con el intervalo configurado.
-        autoTimer = setInterval(
-            runAnalysis,
-            intervalSeconds * 1000
-        );
-
-        log(
-            `Análisis automático activado cada ${intervalSeconds} segundos.`,
-            "success"
-        );
-
+    if (!risk) {
         return {
-            success: true,
-            intervalSeconds
+            success: false,
+            reason: "Primero debes iniciar el motor."
         };
     }
+
+    if (typeof provider !== "function") {
+        return {
+            success: false,
+            reason: "No se ha proporcionado una fuente de datos válida."
+        };
+    }
+
+    stopAuto();
+
+    autoProvider = provider;
+
+    intervalSeconds = Math.max(
+        1,
+        Number(seconds) || 10
+    );
+
+    log(
+        `Análisis automático activado cada ${intervalSeconds} segundos.`,
+        "success"
+    );
+
+    function scheduleNextAnalysis() {
+
+        if (!autoProvider || !risk) {
+            autoTimer = null;
+            return;
+        }
+
+        autoTimer = setTimeout(() => {
+
+            autoTimer = null;
+
+            try {
+
+                runAnalysis();
+
+            } catch (error) {
+
+                lastError = error.message;
+
+                log(
+                    `Error inesperado en el análisis automático: ${error.message}`,
+                    "error"
+                );
+
+            } finally {
+
+                scheduleNextAnalysis();
+
+            }
+
+        }, intervalSeconds * 1000);
+    }
+
+    // Primer análisis inmediato.
+    try {
+
+        runAnalysis();
+
+    } catch (error) {
+
+        lastError = error.message;
+
+        log(
+            `Error en el primer análisis automático: ${error.message}`,
+            "error"
+        );
+    }
+
+    // Programar los siguientes análisis.
+    scheduleNextAnalysis();
+
+    return {
+        success: true,
+        intervalSeconds
+    };
+}
 
     // --------------------------------------------------
     // RESULTADOS MANUALES DE PRUEBA
