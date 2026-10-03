@@ -36,8 +36,8 @@ const TradeEngine = (() => {
     let lastCycleEndTime = 0;
     let cooldownMs = 30000;
 
-    const MAX_POSITIONS = 10;
-    const POSITION_FRACTION = 0.10;
+    const MAX_POSITIONS = 1;
+    const POSITION_FRACTION = 1.00;
 
     const CONFIG = {
         startingCapital: 100,
