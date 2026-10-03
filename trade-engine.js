@@ -1,14 +1,17 @@
 
 /*
  * TRADE AI
- * Motor autónomo v5.0
+ * Motor autónomo v6.0
  *
  * Simulación exclusivamente.
  * No ejecuta órdenes reales ni se conecta a un broker.
  *
  * Configuración:
  * - Capital inicial: $100
+ * - Margen por operación: 100% del capital disponible
  * - Apalancamiento: 1:30
+ * - Exposición inicial: $3,000
+ * - Máximo de posiciones simultáneas: 1
  * - Objetivo neto por ciclo: +$0.20
  * - Pérdida máxima por ciclo: -$5.00
  */
@@ -175,31 +178,17 @@ const TradeEngine = (() => {
         const openPositions = getCurrentCyclePositions();
 
         /*
-         * Cierra las posiciones del ciclo actual.
-         * PositionManager conserva el último resultado
-         * calculado para cada posición.
+         * Cierra las posiciones abiertas al finalizar
+         * el ciclo y conserva el resultado calculado.
          */
 
         if (openPositions.length > 0) {
-
             PositionManager.closeAll(reason);
-
         }
-
-        /*
-         * Recalcular el resultado después del cierre.
-         * El resultado de las posiciones cerradas se conserva
-         * en el historial y no debe sumarse dos veces.
-         */
 
         const finalPL = calculateCyclePL();
 
         const statusBefore = risk.getStatus();
-
-        /*
-         * Si el ciclo sigue activo, actualizamos el resultado.
-         * Si ya alcanzó un límite, conservamos ese estado.
-         */
 
         if (statusBefore.cycleStatus === "ACTIVE") {
             risk.updateCycleProfitLoss(finalPL);
@@ -330,7 +319,7 @@ const TradeEngine = (() => {
         lastCycleEndTime = 0;
 
         log(
-            `Motor iniciado con ${amount.toFixed(4)} USD. Objetivo: +${CONFIG.profitTarget.toFixed(2)} USD. Pérdida máxima: -${CONFIG.maxLoss.toFixed(2)} USD. Apalancamiento: ${CONFIG.leverage}x.`,
+            `Motor iniciado con ${amount.toFixed(4)} USD. Margen por operación: 100%. Objetivo: +${CONFIG.profitTarget.toFixed(2)} USD. Pérdida máxima: -${CONFIG.maxLoss.toFixed(2)} USD. Apalancamiento: ${CONFIG.leverage}x.`,
             "success"
         );
 
@@ -404,7 +393,7 @@ const TradeEngine = (() => {
                 timestamp: new Date().toISOString()
             };
 
-            // 1. Actualizar precio de las posiciones.
+            // 1. Actualizar el precio de las posiciones.
             PositionManager.updatePrice(
                 pair,
                 currentPrice
@@ -440,48 +429,61 @@ const TradeEngine = (() => {
                 };
             }
 
-            // 4. Comprobar máximo de posiciones.
-            if (
-                getCurrentCyclePositions().length >= MAX_POSITIONS
-            ) {
+            // 4. No permitir más de una posición abierta.
+            // Se comprueban todas las posiciones del gestor,
+            // no solamente las del ciclo actual.
+
+            const allOpenPositions =
+                PositionManager.getOpenPositions();
+
+            if (allOpenPositions.length >= MAX_POSITIONS) {
                 return {
                     success: true,
                     analysis,
                     opened: false,
-                    reason: "Se alcanzó el máximo de posiciones abiertas."
+                    reason: "Ya existe una posición abierta. Debe cerrarse antes de utilizar nuevamente el capital."
                 };
             }
 
-            // 5. Calcular margen disponible.
+            // 5. Obtener el balance disponible del ciclo.
+
             const riskStatus = risk.getStatus();
 
             const balance = Number(
                 riskStatus.currentBalance
             );
 
-            const reservedMargin =
-                PositionManager.getTotalMargin();
-
-            const availableMargin = Math.max(
-                0,
-                balance - reservedMargin
-            );
-
-            const margin = Math.min(
-                balance * POSITION_FRACTION,
-                availableMargin
-            );
-
-            if (margin <= 0) {
+            if (
+                !Number.isFinite(balance) ||
+                balance <= 0
+            ) {
                 return {
-                    success: true,
+                    success: false,
                     analysis,
                     opened: false,
-                    reason: "No hay margen disponible."
+                    reason: "El balance disponible no es válido."
                 };
             }
 
+            /*
+             * UTILIZAR EL 100% DEL CAPITAL COMO MARGEN.
+             *
+             * Ejemplo:
+             * Balance: $100
+             * Margen: $100
+             * Apalancamiento: 30x
+             * Exposición esperada: $3,000
+             */
+
+            const margin = balance * POSITION_FRACTION;
+
+            log(
+                `Verificación de capital: Balance ${balance.toFixed(2)} USD | Margen solicitado ${margin.toFixed(2)} USD | Apalancamiento ${CONFIG.leverage}x.`,
+                "info"
+            );
+
             // 6. Abrir posición.
+
             const result = PositionManager.openPosition(
                 pair,
                 analysis.signal,
@@ -501,7 +503,7 @@ const TradeEngine = (() => {
             cyclePositionIds.add(result.position.id);
 
             log(
-                `Nueva posición ${analysis.signal} en ${pair}. Margen: ${margin.toFixed(4)} USD. Exposición: ${result.position.exposure.toFixed(4)} USD.`,
+                `Nueva posición ${analysis.signal} en ${pair}. Margen solicitado: ${margin.toFixed(4)} USD. Exposición registrada: ${Number(result.position.exposure || 0).toFixed(4)} USD.`,
                 "success"
             );
 
@@ -821,6 +823,8 @@ const TradeEngine = (() => {
             config: {
                 startingCapital: CONFIG.startingCapital,
                 leverage: CONFIG.leverage,
+                marginFraction: POSITION_FRACTION,
+                maxPositions: MAX_POSITIONS,
                 profitTarget: CONFIG.profitTarget,
                 maxLoss: CONFIG.maxLoss
             }
