@@ -12,10 +12,10 @@ const PositionManager = (() => {
     let nextId = 1;
 
     const CONFIG = {
-        maxPositions: 3,
-        leverage: 3,
-        takeProfitPercent: 10,
-        stopLossPercent: 20
+        maxPositions: 20,
+        leverage: 1,
+        takeProfitPercent: 1,
+        stopLossPercent: 1
     };
 
     // Contar solamente posiciones abiertas
@@ -46,19 +46,6 @@ const PositionManager = (() => {
             return {
                 success: false,
                 reason: "Datos de entrada no válidos."
-            };
-        }
-
-        const alreadyOpen = positions.some(
-            position =>
-                position.pair === pair &&
-                position.status === "OPEN"
-        );
-
-        if (alreadyOpen) {
-            return {
-                success: false,
-                reason: "Ya existe una posición abierta en este par."
             };
         }
 
