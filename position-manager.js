@@ -1,19 +1,16 @@
 
 /*
  * TRADE AI
- * Gestor de posiciones v3.0
+ * Gestor de posiciones v4.0
+ *
  * Simulación exclusivamente.
  *
- * Configuración:
- * - Apalancamiento 1:30.
- * - Capital inicial gestionado por el motor de riesgo.
+ * - Apalancamiento: 1:30.
+ * - Cálculo de P/L flotante y realizado.
  * - Sin Take Profit ni Stop Loss individuales.
- * - El motor principal controla los límites del ciclo:
- *      Ganancia neta: +$0.20
- *      Pérdida máxima: -$5.00
- * - Cálculo de P/L realizado y flotante.
+ * - Cierre controlado por el motor de riesgo.
  * - Conservación del historial entre ciclos.
- * - Validación de precios y cantidades.
+ * - Margen recibido íntegramente desde TradeEngine.
  */
 
 const PositionManager = (() => {
@@ -41,13 +38,16 @@ const PositionManager = (() => {
             };
         }
 
+        const margin = Number(amount);
+        const entryPrice = Number(price);
+
         if (
             !pair ||
             !["BUY", "SELL"].includes(direction) ||
-            !Number.isFinite(amount) ||
-            amount <= 0 ||
-            !Number.isFinite(price) ||
-            price <= 0
+            !Number.isFinite(margin) ||
+            margin <= 0 ||
+            !Number.isFinite(entryPrice) ||
+            entryPrice <= 0
         ) {
             return {
                 success: false,
@@ -60,14 +60,13 @@ const PositionManager = (() => {
             pair,
             direction,
 
-            margin: amount,
+            margin,
             leverage: CONFIG.leverage,
 
-            // Exposición total de la operación.
-            exposure: amount * CONFIG.leverage,
+            exposure: margin * CONFIG.leverage,
 
-            entryPrice: price,
-            currentPrice: price,
+            entryPrice,
+            currentPrice: entryPrice,
 
             profitLoss: 0,
             profitLossPercent: 0,
@@ -88,15 +87,12 @@ const PositionManager = (() => {
     }
 
     /*
-     * Calcula el resultado de una posición.
+     * Calcula el resultado usando la exposición total.
      *
-     * P/L = margen × variación del precio × apalancamiento
+     * P/L = exposición × variación porcentual del precio
      *
-     * Ejemplo:
-     * Margen: $1
-     * Apalancamiento: 30x
-     * Movimiento favorable: 1%
-     * Ganancia: $0.30
+     * Equivale a:
+     * margen × apalancamiento × movimiento
      */
 
     function calculateProfitLoss(position, price) {
@@ -123,11 +119,7 @@ const PositionManager = (() => {
                 position.entryPrice;
         }
 
-        return (
-            position.margin *
-            movement *
-            position.leverage
-        );
+        return position.exposure * movement;
     }
 
     function updatePositionResult(position, price) {
@@ -156,22 +148,14 @@ const PositionManager = (() => {
         return true;
     }
 
-    /*
-     * Actualiza el precio de todas las posiciones abiertas
-     * de un par.
-     *
-     * IMPORTANTE:
-     * No cierra posiciones individualmente.
-     * El motor principal debe comprobar el P/L neto del ciclo
-     * y ordenar el cierre cuando se alcance +$0.20 o -$5.00.
-     */
-
     function updatePrice(pair, price) {
+
+        const validPrice = Number(price);
 
         if (
             !pair ||
-            !Number.isFinite(price) ||
-            price <= 0
+            !Number.isFinite(validPrice) ||
+            validPrice <= 0
         ) {
             return [];
         }
@@ -185,18 +169,38 @@ const PositionManager = (() => {
                 return;
             }
 
-            updatePositionResult(position, price);
+            updatePositionResult(position, validPrice);
         });
 
-        // Se mantiene el array de retorno para compatibilidad
-        // con el motor de trading existente.
         return [];
     }
 
     /*
-     * Cierra todas las posiciones abiertas.
-     * Conserva el último P/L calculado para cada una.
+     * Cierra solamente las posiciones cuyos IDs se indiquen.
+     * Esto evita cerrar posiciones ajenas al ciclo actual.
      */
+
+    function closePositions(ids, reason = "CYCLE_LIMIT") {
+
+        const idSet = new Set(ids || []);
+        const closed = [];
+
+        positions.forEach(position => {
+
+            if (
+                position.status !== "OPEN" ||
+                !idSet.has(position.id)
+            ) {
+                return;
+            }
+
+            if (closePosition(position, reason)) {
+                closed.push({ ...position });
+            }
+        });
+
+        return closed;
+    }
 
     function closeAll(reason = "CYCLE_LIMIT") {
 
@@ -253,7 +257,7 @@ const PositionManager = (() => {
 
         return getOpenPositions().reduce(
             (total, position) =>
-                total + position.margin,
+                total + Number(position.margin || 0),
             0
         );
     }
@@ -262,15 +266,10 @@ const PositionManager = (() => {
 
         return getOpenPositions().reduce(
             (total, position) =>
-                total + position.exposure,
+                total + Number(position.exposure || 0),
             0
         );
     }
-
-    /*
-     * Reinicia las posiciones abiertas sin borrar el historial.
-     * clearHistory=true elimina todo el historial.
-     */
 
     function reset(clearHistory = false) {
 
@@ -287,6 +286,8 @@ const PositionManager = (() => {
     return {
         openPosition,
         updatePrice,
+        closePosition,
+        closePositions,
         closeAll,
 
         getOpenPositions,
