@@ -13,7 +13,7 @@ const PositionManager = (() => {
 
     const CONFIG = {
         maxPositions: 3,
-        leverage: 10,
+        leverage: 3,
         takeProfitPercent: 10,
         stopLossPercent: 20
     };
