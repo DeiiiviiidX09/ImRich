@@ -412,7 +412,7 @@ function finishCycle(cycleStatus) {
             analysisInProgress = true;
 
             try {
-
+cycleEndedThisRun = false;
                 for (const pair of pairs) {
 
                     let candles;
