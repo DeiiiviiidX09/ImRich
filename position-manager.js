@@ -3,7 +3,7 @@
  * TRADE AI
  * Gestor de posiciones v1.2
  * Simulación exclusivamente.
- * No ejecuta órdenes reales.
+ * Conserva el historial entre ciclos.
  */
 
 const PositionManager = (() => {
@@ -18,7 +18,7 @@ const PositionManager = (() => {
         stopLossPercent: 20
     };
 
-    // Contar solamente las posiciones abiertas
+    // Contar solamente posiciones abiertas
     function countOpenPositions() {
         return positions.filter(
             position => position.status === "OPEN"
@@ -31,7 +31,7 @@ const PositionManager = (() => {
         if (countOpenPositions() >= CONFIG.maxPositions) {
             return {
                 success: false,
-                reason: "Se alcanzó el máximo de posiciones abiertas."
+                reason: "Máximo de posiciones alcanzado."
             };
         }
 
@@ -74,7 +74,8 @@ const PositionManager = (() => {
             status: "OPEN",
             openedAt: new Date().toISOString(),
             closedAt: null,
-            closeReason: null
+            closeReason: null,
+            cycleNumber: null
         };
 
         positions.push(position);
@@ -85,7 +86,7 @@ const PositionManager = (() => {
         };
     }
 
-    // Calcular el resultado de una posición
+    // Calcular resultado de una posición
     function calculateProfitLoss(position, price) {
 
         let movement;
@@ -107,16 +108,6 @@ const PositionManager = (() => {
         );
     }
 
-    // Calcular el resultado flotante de todas las posiciones
-    function getTotalUnrealizedProfitLoss() {
-
-        return getOpenPositions().reduce(
-            (total, position) =>
-                total + position.profitLoss,
-            0
-        );
-    }
-
     // Cerrar una posición
     function closePosition(position, reason) {
 
@@ -129,7 +120,7 @@ const PositionManager = (() => {
         position.closedAt = new Date().toISOString();
     }
 
-    // Actualizar precio y comprobar salida individual
+    // Actualizar precio y comprobar salidas individuales
     function updatePrice(pair, price) {
 
         if (!Number.isFinite(price) || price <= 0) {
@@ -169,7 +160,6 @@ const PositionManager = (() => {
 
                 closePosition(position, "STOP_LOSS");
                 closed.push({ ...position });
-
             }
         });
 
@@ -187,14 +177,13 @@ const PositionManager = (() => {
 
                 closePosition(position, reason);
                 closed.push({ ...position });
-
             }
         });
 
         return closed;
     }
 
-    // Consultar posiciones abiertas
+    // Obtener posiciones abiertas
     function getOpenPositions() {
 
         return positions
@@ -202,28 +191,46 @@ const PositionManager = (() => {
             .map(position => ({ ...position }));
     }
 
-    // Consultar solamente el historial cerrado
+    // Obtener historial completo de posiciones cerradas
     function getHistory() {
 
         return positions
             .filter(position => position.status === "CLOSED")
-            .map(position => ({ ...position }));
+            .map(position => ({ ...position }))
+            .reverse();
     }
 
-    // Consultar exposición total
-    function getTotalMargin() {
+    // Calcular resultado no realizado total
+    function getUnrealizedProfitLoss() {
 
         return getOpenPositions().reduce(
-            (total, position) => total + position.margin,
+            (total, position) =>
+                total + position.profitLoss,
             0
         );
     }
 
-    // Reiniciar el simulador
-    function reset() {
+    // Calcular margen total comprometido
+    function getTotalMargin() {
 
-        positions = [];
-        nextId = 1;
+        return getOpenPositions().reduce(
+            (total, position) =>
+                total + position.margin,
+            0
+        );
+    }
+
+    // Reiniciar posiciones abiertas sin borrar el historial
+    function reset(clearHistory = false) {
+
+        positions = positions.filter(
+            position => position.status === "CLOSED"
+        );
+
+        if (clearHistory) {
+            positions = [];
+            nextId = 1;
+        }
     }
 
     return {
@@ -233,7 +240,7 @@ const PositionManager = (() => {
         getOpenPositions,
         getHistory,
         getTotalMargin,
-        getTotalUnrealizedProfitLoss,
+        getUnrealizedProfitLoss,
         countOpenPositions,
         reset
     };
