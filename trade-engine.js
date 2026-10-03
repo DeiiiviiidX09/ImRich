@@ -1,7 +1,7 @@
 
 /*
  * TRADE AI
- * Motor autónomo v7.0
+ * Motor autónomo v8.0
  *
  * Simulación exclusivamente.
  * No ejecuta órdenes reales ni se conecta a un broker.
@@ -14,6 +14,8 @@
  * - Máximo de posiciones simultáneas: 1
  * - Objetivo neto por ciclo: +$0.20
  * - Pérdida máxima por ciclo: -$5.00
+ * - Análisis automático cada 10 segundos
+ * - Registro de decisiones en cada análisis
  */
 
 const TradeEngine = (() => {
@@ -178,17 +180,13 @@ const TradeEngine = (() => {
         const openPositions = getCurrentCyclePositions();
 
         /*
-         * Cierra solamente las posiciones pertenecientes
-         * al ciclo actual.
+         * El motor autónomo trabaja con una sola posición
+         * simultánea. Se cierran las posiciones abiertas
+         * cuando se alcanza el límite del ciclo.
          */
 
         if (openPositions.length > 0) {
-
-            const ids = openPositions.map(
-                position => position.id
-            );
-
-            PositionManager.closePositions(ids, reason);
+            PositionManager.closeAll(reason);
         }
 
         const finalPL = calculateCyclePL();
@@ -421,11 +419,6 @@ const TradeEngine = (() => {
                 analysis.signal !== "BUY" &&
                 analysis.signal !== "SELL"
             ) {
-                log(
-                    `${pair}: sin señal de entrada.`,
-                    "info"
-                );
-
                 return {
                     success: true,
                     analysis,
@@ -546,12 +539,29 @@ const TradeEngine = (() => {
 
         if (!autoProvider || !risk) return;
 
+        const executionTime =
+            new Date().toLocaleTimeString();
+
+        log(
+            `Análisis automático ejecutado a las ${executionTime}. Estado: ${engineStatus}.`,
+            "info"
+        );
+
+        // Si el ciclo terminó, buscar condiciones para reiniciarlo.
         if (engineStatus === "WAITING") {
 
             const elapsed =
                 Date.now() - lastCycleEndTime;
 
-            if (elapsed < cooldownMs) return;
+            if (elapsed < cooldownMs) {
+
+                log(
+                    `Esperando reinicio del ciclo. Tiempo restante: ${Math.ceil((cooldownMs - elapsed) / 1000)} segundos.`,
+                    "info"
+                );
+
+                return;
+            }
 
             let foundSignal = false;
 
@@ -567,6 +577,16 @@ const TradeEngine = (() => {
 
                     const candles = autoProvider(pair);
                     const analysis = TradeAI.analyze(candles);
+
+                    lastSignals[pair] = {
+                        ...analysis,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    log(
+                        `${pair}: señal durante la búsqueda de un nuevo ciclo: ${analysis.signal || "SIN SEÑAL"}.`,
+                        "info"
+                    );
 
                     if (
                         analysis.signal === "BUY" ||
@@ -592,7 +612,7 @@ const TradeEngine = (() => {
             if (!foundSignal) {
 
                 log(
-                    "Esperando condiciones adecuadas para reiniciar.",
+                    "No se encontraron señales para reiniciar el ciclo.",
                     "info"
                 );
 
@@ -623,18 +643,50 @@ const TradeEngine = (() => {
 
                 const candles = autoProvider(pair);
 
-                analyzePair(pair, candles);
+                const result = analyzePair(pair, candles);
+
+                if (result.success) {
+
+                    if (result.opened) {
+
+                        log(
+                            `${pair}: operación abierta correctamente.`,
+                            "success"
+                        );
+
+                    } else {
+
+                        log(
+                            `${pair}: análisis completado. ${result.reason || "Sin nueva operación."}`,
+                            "info"
+                        );
+                    }
+
+                } else {
+
+                    log(
+                        `${pair}: análisis no completado. ${result.reason || "Error desconocido."}`,
+                        "warning"
+                    );
+                }
 
             } catch (error) {
 
                 lastError = error.message;
 
                 log(
-                    `Error en el ciclo automático: ${error.message}`,
+                    `Error en el ciclo automático de ${pair}: ${error.message}`,
                     "error"
                 );
             }
         }
+
+        const currentPL = calculateCyclePL();
+
+        log(
+            `Resumen del análisis: resultado del ciclo ${currentPL.toFixed(4)} USD. Posiciones abiertas: ${getCurrentCyclePositions().length}.`,
+            "info"
+        );
     }
 
     // --------------------------------------------------
@@ -666,8 +718,10 @@ const TradeEngine = (() => {
             Number(seconds) || 10
         );
 
+        // Ejecutar el primer análisis inmediatamente.
         runAnalysis();
 
+        // Continuar con el intervalo configurado.
         autoTimer = setInterval(
             runAnalysis,
             intervalSeconds * 1000
