@@ -575,9 +575,8 @@ input, select {
 <script src="risk.js"></script>
 <script src="position-manager.js"></script>
 <script src="trade-engine.js"></script>
+
 <script>
-
-
 let balance = 100;
 let totalPL = 0;
 let closedCount = 0;
@@ -588,13 +587,12 @@ let history = [];
 
 const STORAGE_KEY = "tradeAI_simulation_v1";
 
-// Guardar el estado de la aplicación en el iPhone
 function saveState() {
     const state = {
         balance,
         totalPL,
         closedCount,
-        robotActivo,
+        robotActivo: false,
         emergencia,
         activeTrade,
         history
@@ -607,11 +605,9 @@ function saveState() {
     }
 }
 
-// Recuperar los datos guardados
 function loadState() {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
-
         if (!saved) return;
 
         const state = JSON.parse(saved);
@@ -624,38 +620,29 @@ function loadState() {
         emergencia = Boolean(state.emergencia);
         activeTrade = state.activeTrade || null;
         history = Array.isArray(state.history) ? state.history : [];
-
     } catch (error) {
         console.error("No se pudieron recuperar los datos:", error);
     }
 }
 
 function money(value) {
-    return "$" + value.toFixed(2);
+    return "$" + Number(value || 0).toFixed(2);
 }
 
 function escribirLog(texto) {
     const log = document.getElementById("log");
-    const hora = new Date().toLocaleTimeString();
+    if (!log) return;
 
-    log.innerHTML =
-        "[" + hora + "] " +
-        texto +
-        "<br>" +
-        log.innerHTML;
+    const hora = new Date().toLocaleTimeString();
+    log.innerHTML = "[" + hora + "] " + texto + "<br>" + log.innerHTML;
 }
 
 function updateUI() {
     document.getElementById("balance").textContent = money(balance);
 
     const pl = document.getElementById("totalPL");
-
-    pl.textContent =
-        (totalPL >= 0 ? "+" : "") + money(totalPL);
-
-    pl.className =
-        "metric-value " +
-        (totalPL >= 0 ? "profit" : "loss");
+    pl.textContent = (totalPL >= 0 ? "+" : "") + money(totalPL);
+    pl.className = "metric-value " + (totalPL >= 0 ? "profit" : "loss");
 
     document.getElementById("closedCount").textContent = closedCount;
 
@@ -673,16 +660,12 @@ function updateUI() {
         active.innerHTML =
             "<div class='operation'><span>Par</span><strong>" +
             activeTrade.pair + "</strong></div>" +
-
             "<div class='operation'><span>Dirección</span><strong>" +
             activeTrade.direction + "</strong></div>" +
-
             "<div class='operation'><span>Invertido</span><strong>" +
             money(activeTrade.amount) + "</strong></div>" +
-
             "<div class='operation'><span>Objetivo de ganancia</span><strong class='profit'>+" +
             money(activeTrade.amount * 0.10) + "</strong></div>" +
-
             "<div class='operation'><span>Límite de pérdida</span><strong class='loss'>-" +
             money(activeTrade.amount * 0.20) + "</strong></div>";
     } else {
@@ -691,8 +674,7 @@ function updateUI() {
 
     document.getElementById("tpBtn").disabled = !activeTrade;
     document.getElementById("slBtn").disabled = !activeTrade;
-    document.getElementById("openBtn").disabled =
-        !!activeTrade || emergencia;
+    document.getElementById("openBtn").disabled = !!activeTrade || emergencia;
 
     const historyBox = document.getElementById("history");
 
@@ -705,80 +687,66 @@ function updateUI() {
             "<br><small>" + item.result + " · " + item.time +
             "</small></span><strong class='" +
             (item.pl >= 0 ? "profit" : "loss") + "'>" +
-            (item.pl >= 0 ? "+" : "") +
-            money(item.pl) +
+            (item.pl >= 0 ? "+" : "") + money(item.pl) +
             "</strong></div>"
         ).join("");
     }
 
+    updateEngineTest();
+    updateRiskTest();
     saveState();
 }
 
-
 function startRobot() {
-
     if (robotActivo) {
         escribirLog("El robot ya está activo.");
         return;
     }
 
     emergencia = false;
-    robotActivo = true;
 
-    // Iniciar el motor central
-    TradeEngine.start(balance);
+    const started = TradeEngine.start(balance);
 
-    // Activar análisis automático cada 30 segundos
-    const resultado = TradeEngine.startAuto(
-        generateTestCandles,
-        10
-    );
+    if (!started.success) {
+        escribirLog("No se pudo iniciar: " + started.reason);
+        return;
+    }
 
-    if (!resultado.success) {
+    const result = TradeEngine.startAuto(generateTestCandles, 10);
 
-        robotActivo = false;
-
-        escribirLog(
-            "No se pudo iniciar el motor: " +
-            resultado.reason
-        );
-
+    if (!result.success) {
+        TradeEngine.stop();
+        escribirLog("Error al activar el análisis: " + result.reason);
         updateUI();
         return;
     }
 
-    escribirLog(
-        "Robot activado. Análisis y gestión automáticos iniciados."
-    );
-
+    robotActivo = true;
+    escribirLog("Robot activado. Análisis automático cada 10 segundos.");
     updateUI();
 }
 
 function stopRobot() {
-
     robotActivo = false;
-
     TradeEngine.stop();
 
-    escribirLog(
-        "Robot detenido. El análisis automático se ha cancelado."
-    );
-
+    escribirLog("Robot detenido. Las posiciones abiertas se mantienen en la simulación.");
     updateUI();
 }
 
-
 function emergencyStop() {
-
     robotActivo = false;
     emergencia = true;
 
     TradeEngine.stop();
 
-    escribirLog(
-        "PARADA DE EMERGENCIA. Motor detenido y nuevas operaciones bloqueadas."
-    );
+    const openPositions = PositionManager.getOpenPositions();
 
+    if (openPositions.length > 0) {
+        PositionManager.closeAll("EMERGENCY_STOP");
+    }
+
+    escribirLog("PARADA DE EMERGENCIA. Motor detenido y posiciones abiertas cerradas.");
     updateUI();
 }
 
@@ -803,15 +771,10 @@ function openTrade() {
     activeTrade = {
         pair: document.getElementById("pair").value,
         direction: document.getElementById("direction").value,
-        amount: amount
+        amount
     };
 
-    escribirLog(
-        "Operación simulada abierta en " +
-        activeTrade.pair + " por " +
-        money(amount) + "."
-    );
-
+    escribirLog("Operación simulada abierta en " + activeTrade.pair + " por " + money(amount) + ".");
     updateUI();
 }
 
@@ -824,52 +787,44 @@ function simulateResult(percent) {
     totalPL += pl;
     closedCount++;
 
-    const result =
-        percent > 0 ? "Take Profit" : "Stop Loss";
+    const result = percent > 0 ? "Take Profit" : "Stop Loss";
 
     history.unshift({
         pair: activeTrade.pair,
         direction: activeTrade.direction,
-        pl: pl,
-        result: result,
+        pl,
+        result,
         time: new Date().toLocaleString()
     });
 
-    escribirLog(
-        result + " alcanzado. Resultado simulado: " +
-        (pl >= 0 ? "+" : "") + money(pl) + "."
-    );
+    escribirLog(result + " alcanzado. Resultado simulado: " +
+        (pl >= 0 ? "+" : "") + money(pl) + ".");
 
     activeTrade = null;
     updateUI();
 }
 
 function resetSimulation() {
-    if (!confirm(
-        "¿Seguro que quieres borrar el historial y reiniciar el capital a $100?"
-    )) {
+    if (!confirm("¿Seguro que quieres borrar el historial y reiniciar el capital a $100?")) {
         return;
     }
 
+    TradeEngine.stop();
+    robotActivo = false;
+    emergencia = false;
     balance = 100;
     totalPL = 0;
     closedCount = 0;
-    robotActivo = false;
-    emergencia = false;
     activeTrade = null;
     history = [];
 
-    document.getElementById("log").innerHTML =
-        "Simulación reiniciada.<br>";
+    document.getElementById("log").innerHTML = "Simulación reiniciada.<br>";
 
     escribirLog("Capital restaurado a $100.");
-
     updateUI();
 }
 
-// Generador de velas artificiales para pruebas
 function generateTestCandles(pair) {
-
     const basePrices = {
         "EUR/USD": 1.1000,
         "GBP/USD": 1.2700,
@@ -877,264 +832,168 @@ function generateTestCandles(pair) {
     };
 
     let price = basePrices[pair];
-
     const candles = [];
 
-    // Crear 100 velas con una tendencia artificial
     for (let i = 0; i < 100; i++) {
-
         const trend = Math.sin(i / 12) * 0.0002;
         const noise = (Math.random() - 0.5) * 0.001;
-
         const open = price;
         const close = price + trend + noise;
 
-        const high = Math.max(open, close) +
-            Math.random() * 0.0003;
+        const high = Math.max(open, close) + Math.random() * 0.0003;
+        const low = Math.min(open, close) - Math.random() * 0.0003;
 
-        const low = Math.min(open, close) -
-            Math.random() * 0.0003;
-
-        candles.push({
-            open: open,
-            high: high,
-            low: low,
-            close: close
-        });
-
+        candles.push({ open, high, low, close });
         price = close;
     }
 
     return candles;
 }
 
-
-// Ejecutar análisis del mercado
 function analyzeMarket() {
-
-    const pair =
-        document.getElementById("analysisPair").value;
-
+    const pair = document.getElementById("analysisPair").value;
     const candles = generateTestCandles(pair);
-
     const result = TradeAI.analyze(candles);
 
-    const signalElement =
-        document.getElementById("marketSignal");
-
-    const reasonElement =
-        document.getElementById("signalReason");
+    const signalElement = document.getElementById("marketSignal");
+    const reasonElement = document.getElementById("signalReason");
 
     signalElement.textContent = result.signal;
+    reasonElement.textContent = result.reason;
 
-    reasonElement.textContent =
-        result.reason;
-
-    if (result.signal === "BUY") {
-        signalElement.style.color = "#50d890";
-    } else if (result.signal === "SELL") {
-        signalElement.style.color = "#ff6262";
-    } else {
-        signalElement.style.color = "#ffffff";
-    }
+    signalElement.style.color =
+        result.signal === "BUY" ? "#50d890" :
+        result.signal === "SELL" ? "#ff6262" : "#ffffff";
 
     if (result.indicators) {
-
         document.getElementById("ema20Value").textContent =
             result.indicators.emaFast.toFixed(5);
-
         document.getElementById("ema50Value").textContent =
             result.indicators.emaSlow.toFixed(5);
-
         document.getElementById("rsiValue").textContent =
             result.indicators.rsi.toFixed(2);
-
         document.getElementById("atrValue").textContent =
             result.indicators.atr.toFixed(5);
-
-    } else {
-
-        document.getElementById("ema20Value").textContent = "--";
-        document.getElementById("ema50Value").textContent = "--";
-        document.getElementById("rsiValue").textContent = "--";
-        document.getElementById("atrValue").textContent = "--";
-
     }
 
-    escribirLog(
-        "Análisis simulado de " + pair +
-        ": " + result.signal +
-        ". " + result.reason
-    );
+    escribirLog("Análisis simulado de " + pair + ": " + result.signal + ". " + result.reason);
 }
 
-// Inicializar el gestor de riesgo de prueba
 TradeRisk.startCycle(100);
 
-
-// Actualizar los datos del panel de riesgo
 function updateRiskTest() {
-
     const status = TradeRisk.getStatus();
 
-    document.getElementById("riskStatus").textContent =
-        status.cycleStatus;
+    document.getElementById("riskStatus").textContent = status.cycleStatus;
+    document.getElementById("riskStart").textContent = money(status.startingBalance);
+    document.getElementById("riskBalance").textContent = money(status.currentBalance);
 
-    document.getElementById("riskStart").textContent =
-        money(status.startingBalance);
+    const plElement = document.getElementById("riskPL");
+    plElement.textContent =
+        (status.cycleProfitLoss >= 0 ? "+" : "") + money(status.cycleProfitLoss);
 
-    document.getElementById("riskBalance").textContent =
-        money(status.currentBalance);
+    plElement.className =
+        "metric-value " + (status.cycleProfitLoss >= 0 ? "profit" : "loss");
 
-    document.getElementById("riskPL").textContent =
-        (status.cycleProfitLoss >= 0 ? "+" : "") +
-        money(status.cycleProfitLoss);
-
-    document.getElementById("riskAction").textContent =
-        status.action;
-
-    document.getElementById("riskPL").className =
-        "metric-value " +
-        (status.cycleProfitLoss >= 0 ? "profit" : "loss");
+    document.getElementById("riskAction").textContent = status.action;
 }
 
-
-// Registrar un resultado de prueba
 function recordRiskTest(amount) {
-
-    const result = TradeRisk.recordTrade(amount);
-
+    TradeRisk.recordTrade(amount);
     updateRiskTest();
 
-    document.getElementById("riskMessage").textContent =
-        "Resultado registrado. Estado: " +
-        result.cycleStatus +
-        ". Acción: " + result.action;
-}
-
-
-// Simular ganancia
-function testRiskProfit() {
-
-    recordRiskTest(1);
-
-}
-
-
-// Simular pérdida
-function testRiskLoss() {
-
-    recordRiskTest(-0.50);
-
-}
-
-
-// Reiniciar la prueba con el capital restante
-function resetRiskTest() {
-
     const status = TradeRisk.getStatus();
 
-    if (
-        status.cycleStatus === "ACTIVE" &&
-        status.cycleProfitLoss === 0
-    ) {
-        document.getElementById("riskMessage").textContent =
-            "El ciclo ya está reiniciado.";
+    document.getElementById("riskMessage").textContent =
+        "Resultado registrado. Estado: " + status.cycleStatus +
+        ". Acción: " + status.action;
+}
+
+function testRiskProfit() {
+    recordRiskTest(1);
+}
+
+function testRiskLoss() {
+    recordRiskTest(-0.50);
+}
+
+function resetRiskTest() {
+    const status = TradeRisk.getStatus();
+
+    if (status.cycleStatus === "ACTIVE" && status.cycleProfitLoss === 0) {
+        document.getElementById("riskMessage").textContent = "El ciclo ya está reiniciado.";
         return;
     }
 
-    const result =
-        TradeRisk.resetCycle(status.currentBalance);
+    const result = TradeRisk.resetCycle(status.currentBalance);
 
     updateRiskTest();
 
     document.getElementById("riskMessage").textContent =
-        "Nuevo ciclo iniciado con " +
-        money(result.startingBalance) +
-        ". La progresión de prueba comienza de nuevo.";
+        "Nuevo ciclo iniciado con " + money(result.startingBalance) + ".";
 }
 
-// Iniciar el motor autónomo de prueba
 function startEngineTest() {
+    const result = TradeEngine.start(balance);
 
-    const status = TradeEngine.start(balance);
+    if (!result.success) {
+        alert(result.reason);
+        return;
+    }
 
     updateEngineTest();
-
     escribirLog("Motor autónomo de prueba iniciado.");
 }
 
-
-// Detener el motor
 function stopEngineTest() {
-
     TradeEngine.stop();
-
     updateEngineTest();
 }
 
-
-// Analizar los tres pares
 function analyzeEngineTest() {
-
-    const pairs = [
-        "EUR/USD",
-        "GBP/USD",
-        "USD/JPY"
-    ];
+    const pairs = ["EUR/USD", "GBP/USD", "USD/JPY"];
 
     pairs.forEach(pair => {
-
-        const candles = generateTestCandles(pair);
-
-        TradeEngine.analyzePair(pair, candles);
-
+        TradeEngine.analyzePair(pair, generateTestCandles(pair));
     });
 
     updateEngineTest();
 }
 
-
-// Simular una ganancia
 function simulateEngineProfit() {
+    const result = TradeEngine.recordResult(1);
 
-    TradeEngine.recordResult(1);
+    if (!result.success) alert(result.reason);
 
     updateEngineTest();
 }
 
-
-// Simular una pérdida
 function simulateEngineLoss() {
+    const result = TradeEngine.recordResult(-0.50);
 
-    TradeEngine.recordResult(-0.50);
+    if (!result.success) alert(result.reason);
 
     updateEngineTest();
 }
 
-
-// Reiniciar el ciclo con el capital restante
 function restartEngineTest() {
-
     const status = TradeEngine.getStatus();
 
-    if (
-        status.engineStatus !== "WAITING" &&
-        status.engineStatus !== "RESTART_REQUIRED"
-    ) {
-        alert("El motor todavía no necesita reiniciar el ciclo.");
+    if (status.engineStatus !== "WAITING") {
+        alert("El motor debe estar esperando para reiniciar el ciclo.");
         return;
     }
 
-    TradeEngine.restartCycle();
+    const result = TradeEngine.restartCycle();
+
+    if (!result.success) {
+        alert(result.reason);
+    }
 
     updateEngineTest();
 }
 
-
-// Actualizar la interfaz del motor
 function updateEngineTest() {
-
     const status = TradeEngine.getStatus();
     const risk = status.risk;
 
@@ -1142,64 +1001,34 @@ function updateEngineTest() {
         status.engineStatus;
 
     document.getElementById("engineBalance").textContent =
-        money(risk.currentBalance);
+        money(risk ? risk.currentBalance : 0);
 
     const plElement = document.getElementById("enginePL");
+    const cyclePL = status.cycleProfitLoss || 0;
 
     plElement.textContent =
-        (risk.cycleProfitLoss >= 0 ? "+" : "") +
-        money(risk.cycleProfitLoss);
+        (cyclePL >= 0 ? "+" : "") + money(cyclePL);
 
     plElement.className =
-        "metric-value " +
-        (risk.cycleProfitLoss >= 0 ? "profit" : "loss");
+        "metric-value " + (cyclePL >= 0 ? "profit" : "loss");
 
-
-    // Mostrar señales
-    const signalsBox =
-        document.getElementById("engineSignals");
-
-    const signals = Object.entries(status.lastSignals);
+    const signalsBox = document.getElementById("engineSignals");
+    const signals = Object.entries(status.lastSignals || {});
 
     signalsBox.innerHTML = signals.length
         ? signals.map(([pair, data]) =>
-            "<div class='operation'><span>" +
-            pair + "</span><strong>" +
-            data.signal + "</strong></div>"
+            "<div class='operation'><span>" + pair +
+            "</span><strong>" + data.signal + "</strong></div>"
         ).join("")
         : "Todavía no hay señales.";
 
-
-    // Mostrar posiciones abiertas
-    const positionsBox =
-        document.getElementById("enginePositions");
-
-    const positions = status.positions || [];
+    const positionsBox = document.getElementById("enginePositions");
+    const positions = status.openPositions || [];
 
     positionsBox.innerHTML = positions.length
         ? positions.map(position => {
-
-            const pl = Number(
-                position.profitLoss ??
-                position.unrealizedPL ??
-                position.pnl ??
-                0
-            );
-
-            const margin = Number(
-                position.margin ??
-                position.amount ??
-                position.invested ??
-                0
-            );
-
-            const entry = Number(
-                position.entryPrice ?? 0
-            );
-
-            const current = Number(
-                position.currentPrice ?? 0
-            );
+            const pl = Number(position.profitLoss || 0);
+            const margin = Number(position.margin || 0);
 
             return `
                 <div class="operation">
@@ -1207,8 +1036,8 @@ function updateEngineTest() {
                         <strong>${position.pair}</strong><br>
                         Dirección: ${position.direction}<br>
                         Margen: ${money(margin)}<br>
-                        Entrada: ${entry || "--"}<br>
-                        Precio actual: ${current || "--"}
+                        Entrada: ${position.entryPrice}<br>
+                        Precio actual: ${position.currentPrice}
                     </span>
                     <strong class="${pl >= 0 ? "profit" : "loss"}">
                         ${pl >= 0 ? "+" : ""}${money(pl)}
@@ -1218,29 +1047,19 @@ function updateEngineTest() {
         }).join("")
         : "No hay posiciones abiertas.";
 
+    const historyBox = document.getElementById("enginePositionHistory");
+    const positionHistory = status.positionHistory || [];
 
-    // Mostrar historial de posiciones cerradas
-    const positionHistoryBox =
-        document.getElementById("enginePositionHistory");
-
-    const positionHistory = status.history || [];
-
-    positionHistoryBox.innerHTML = positionHistory.length
+    historyBox.innerHTML = positionHistory.length
         ? positionHistory.map(position => {
-
-            const pl = Number(
-                position.profitLoss ??
-                position.unrealizedPL ??
-                position.pnl ??
-                0
-            );
+            const pl = Number(position.profitLoss || 0);
 
             return `
                 <div class="operation">
                     <span>
                         <strong>${position.pair}</strong><br>
-                        ${position.direction || ""}<br>
-                        ${position.reason || position.status || "Cerrada"}
+                        ${position.direction}<br>
+                        ${position.closeReason || position.status || "Cerrada"}
                     </span>
                     <strong class="${pl >= 0 ? "profit" : "loss"}">
                         ${pl >= 0 ? "+" : ""}${money(pl)}
@@ -1250,23 +1069,20 @@ function updateEngineTest() {
         }).join("")
         : "Todavía no hay posiciones cerradas.";
 
-    // Mostrar decisiones
-    const logBox =
-        document.getElementById("engineLog");
+    const logBox = document.getElementById("engineLog");
+    const decisions = status.decisionLog || [];
 
-    logBox.innerHTML = status.decisions.length
-        ? status.decisions.map(item =>
-            "<div>[" + item.time + "] " +
-            item.message + "</div>"
+    logBox.innerHTML = decisions.length
+        ? decisions.map(item =>
+            "<div>[" + new Date(item.timestamp).toLocaleTimeString() +
+            "] " + item.message + "</div>"
         ).join("")
         : "Sin decisiones registradas.";
 }
 
-// Al abrir la página, recuperar los datos guardados
 loadState();
 updateUI();
-
-
 </script>
+
 </body>
 </html>
