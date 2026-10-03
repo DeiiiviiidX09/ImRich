@@ -1,1 +1,197 @@
-d
+
+/*
+ * TRADE AI
+ * Gestor de posiciones v1.0
+ * Simulación exclusivamente.
+ * No ejecuta órdenes reales.
+ */
+
+const PositionManager = (() => {
+
+    let positions = [];
+    let nextId = 1;
+
+    const CONFIG = {
+        maxPositions: 3,
+        leverage: 10,
+        takeProfitPercent: 10,
+        stopLossPercent: 20
+    };
+
+    // Abrir una posición simulada
+    function openPosition(pair, direction, amount, price) {
+
+        if (positions.length >= CONFIG.maxPositions) {
+            return {
+                success: false,
+                reason: "Se alcanzó el máximo de posiciones abiertas."
+            };
+        }
+
+        if (
+            !pair ||
+            !["BUY", "SELL"].includes(direction) ||
+            !Number.isFinite(amount) ||
+            amount <= 0 ||
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
+            return {
+                success: false,
+                reason: "Datos de entrada no válidos."
+            };
+        }
+
+        const position = {
+            id: nextId++,
+            pair,
+            direction,
+            margin: amount,
+            leverage: CONFIG.leverage,
+            entryPrice: price,
+            currentPrice: price,
+            profitLoss: 0,
+            status: "OPEN",
+            openedAt: new Date().toISOString()
+        };
+
+        positions.push(position);
+
+        return {
+            success: true,
+            position: { ...position }
+        };
+    }
+
+    // Actualizar precio y comprobar salida
+    function updatePrice(pair, price) {
+
+        if (!Number.isFinite(price) || price <= 0) {
+            return [];
+        }
+
+        const closed = [];
+
+        positions.forEach(position => {
+
+            if (
+                position.pair !== pair ||
+                position.status !== "OPEN"
+            ) {
+                return;
+            }
+
+            position.currentPrice = price;
+
+            let movement;
+
+            if (position.direction === "BUY") {
+                movement =
+                    (price - position.entryPrice) /
+                    position.entryPrice;
+            } else {
+                movement =
+                    (position.entryPrice - price) /
+                    position.entryPrice;
+            }
+
+            // El apalancamiento amplifica el resultado
+            const pnlPercent =
+                movement * position.leverage * 100;
+
+            position.profitLoss =
+                position.margin * pnlPercent / 100;
+
+            const profitTarget =
+                position.margin *
+                CONFIG.takeProfitPercent / 100;
+
+            const lossLimit =
+                position.margin *
+                CONFIG.stopLossPercent / 100;
+
+            if (position.profitLoss >= profitTarget) {
+
+                closePosition(position, "TAKE_PROFIT");
+                closed.push({ ...position });
+
+            } else if (position.profitLoss <= -lossLimit) {
+
+                closePosition(position, "STOP_LOSS");
+                closed.push({ ...position });
+
+            }
+        });
+
+        return closed;
+    }
+
+    // Cerrar una posición
+    function closePosition(position, reason) {
+
+        position.status = "CLOSED";
+        position.closeReason = reason;
+        position.closedAt = new Date().toISOString();
+    }
+
+    // Cerrar todas las posiciones abiertas
+    function closeAll(reason = "CYCLE_LIMIT") {
+
+        const closed = [];
+
+        positions.forEach(position => {
+
+            if (position.status === "OPEN") {
+
+                closePosition(position, reason);
+                closed.push({ ...position });
+
+            }
+        });
+
+        return closed;
+    }
+
+    // Consultar posiciones abiertas
+    function getOpenPositions() {
+
+        return positions
+            .filter(position => position.status === "OPEN")
+            .map(position => ({ ...position }));
+    }
+
+    // Consultar historial
+    function getHistory() {
+
+        return positions.map(position => ({ ...position }));
+    }
+
+    // Consultar exposición total
+    function getTotalMargin() {
+
+        return getOpenPositions().reduce(
+            (total, position) => total + position.margin,
+            0
+        );
+    }
+
+    // Reiniciar el simulador
+    function reset() {
+
+        positions = [];
+        nextId = 1;
+    }
+
+    return {
+        openPosition,
+        updatePrice,
+        closeAll,
+        getOpenPositions,
+        getHistory,
+        getTotalMargin,
+        reset
+    };
+
+})();
+
+window.PositionManager = PositionManager;
