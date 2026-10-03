@@ -1,17 +1,14 @@
 
 /*
  * TRADE AI
- * Gestor de riesgo v4.0
- * Solo simulación.
+ * Gestor de riesgo v5.0
  *
- * Configuración:
- * - Capital inicial: $100
- * - Apalancamiento: 1:30
- * - Objetivo neto por ciclo: +$0.20
- * - Pérdida máxima por ciclo: -$5.00
+ * Simulación exclusivamente.
  *
- * Los límites son cantidades fijas en USD,
- * no porcentajes del capital.
+ * - Objetivo de beneficio por ciclo: +$0.20.
+ * - Pérdida máxima por ciclo: -$5.00.
+ * - Apalancamiento: 1:30.
+ * - El balance se actualiza con el resultado neto del ciclo.
  */
 
 const TradeRisk = (() => {
@@ -24,167 +21,142 @@ const TradeRisk = (() => {
 
     function createManager() {
 
-        let cycleStartBalance = 100;
+        let startingBalance = 0;
+        let currentBalance = 0;
         let cycleProfitLoss = 0;
-        let cycleNumber = 1;
-        let cycleStatus = "ACTIVE";
+        let cycleNumber = 0;
+        let cycleStatus = "INACTIVE";
+        let startedAt = null;
+        let finishedAt = null;
 
-        function startCycle(balance) {
+        function startCycle(capital) {
 
-            if (!Number.isFinite(balance) || balance <= 0) {
-                throw new Error("Capital no válido.");
+            const amount = Number(capital);
+
+            if (!Number.isFinite(amount) || amount <= 0) {
+                throw new Error(
+                    "El capital inicial debe ser un número positivo."
+                );
             }
 
-            cycleStartBalance = balance;
+            startingBalance = amount;
+            currentBalance = amount;
             cycleProfitLoss = 0;
+            cycleNumber = 1;
             cycleStatus = "ACTIVE";
+            startedAt = new Date().toISOString();
+            finishedAt = null;
 
             return getStatus();
         }
 
-        /*
-         * Actualiza el resultado neto total del ciclo.
-         * Incluye P/L realizado, flotante y resultados
-         * manuales registrados por el motor.
-         */
+        function updateCycleProfitLoss(value) {
 
-        function updateCycleProfitLoss(totalProfitLoss) {
+            const result = Number(value);
 
-            if (!Number.isFinite(totalProfitLoss)) {
-                throw new Error("Resultado no válido.");
+            if (!Number.isFinite(result)) {
+                return getStatus();
             }
+
+            cycleProfitLoss = result;
+            currentBalance = startingBalance + cycleProfitLoss;
 
             if (cycleStatus !== "ACTIVE") {
                 return getStatus();
             }
 
-            cycleProfitLoss = totalProfitLoss;
+            if (cycleProfitLoss >= CONFIG.profitTargetUSD) {
 
-            checkLimits();
-
-            return getStatus();
-        }
-
-        /*
-         * Registrar un resultado adicional.
-         * Se conserva para las pruebas manuales.
-         */
-
-        function recordTrade(profitLoss) {
-
-            if (cycleStatus !== "ACTIVE") {
-                return getStatus();
-            }
-
-            if (!Number.isFinite(profitLoss)) {
-                throw new Error("Resultado no válido.");
-            }
-
-            cycleProfitLoss += profitLoss;
-
-            checkLimits();
-
-            return getStatus();
-        }
-
-        /*
-         * Comprobar límites fijos del ciclo.
-         */
-
-        function checkLimits() {
-
-            if (
-                cycleProfitLoss >= CONFIG.profitTargetUSD
-            ) {
                 cycleStatus = "TAKE_PROFIT";
+                finishedAt = new Date().toISOString();
 
-            } else if (
-                cycleProfitLoss <= -CONFIG.maxLossUSD
-            ) {
+            } else if (cycleProfitLoss <= -CONFIG.maxLossUSD) {
+
                 cycleStatus = "LOSS_LIMIT";
+                finishedAt = new Date().toISOString();
             }
+
+            return getStatus();
+        }
+
+        function resetCycle(remainingBalance) {
+
+            const amount = Number(remainingBalance);
+
+            if (!Number.isFinite(amount) || amount <= 0) {
+                throw new Error(
+                    "No hay balance válido para iniciar el siguiente ciclo."
+                );
+            }
+
+            startingBalance = amount;
+            currentBalance = amount;
+            cycleProfitLoss = 0;
+            cycleNumber += 1;
+            cycleStatus = "ACTIVE";
+            startedAt = new Date().toISOString();
+            finishedAt = null;
+
+            return getStatus();
         }
 
         function getStatus() {
 
-            const profitTarget =
-                CONFIG.profitTargetUSD;
+            const profitProgress =
+                CONFIG.profitTargetUSD > 0
+                    ? Math.max(
+                        0,
+                        (cycleProfitLoss / CONFIG.profitTargetUSD) * 100
+                    )
+                    : 0;
 
-            const lossLimit =
-                CONFIG.maxLossUSD;
-
-            const currentBalance =
-                cycleStartBalance + cycleProfitLoss;
-
-            let action = "CONTINUE";
-
-            if (
-                cycleStatus === "TAKE_PROFIT" ||
-                cycleStatus === "LOSS_LIMIT"
-            ) {
-                action = "CLOSE_ALL_AND_WAIT";
-            }
+            const lossProgress =
+                CONFIG.maxLossUSD > 0
+                    ? Math.max(
+                        0,
+                        (Math.abs(Math.min(0, cycleProfitLoss)) /
+                            CONFIG.maxLossUSD) * 100
+                    )
+                    : 0;
 
             return {
-                cycleNumber,
-                cycleStatus,
-                action,
-
-                startingBalance: cycleStartBalance,
+                startingBalance,
                 currentBalance,
                 cycleProfitLoss,
+                cycleNumber,
+                cycleStatus,
 
-                profitTarget,
-                lossLimit,
+                profitTarget: CONFIG.profitTargetUSD,
+                profitTargetUSD: CONFIG.profitTargetUSD,
 
-                profitProgress:
-                    (cycleProfitLoss / profitTarget) * 100,
+                maxLoss: CONFIG.maxLossUSD,
+                maxLossUSD: CONFIG.maxLossUSD,
 
-                lossProgress:
-                    (
-                        Math.abs(
-                            Math.min(0, cycleProfitLoss)
-                        ) / lossLimit
-                    ) * 100,
+                leverage: CONFIG.leverage,
 
-                leverage: CONFIG.leverage
+                profitProgress,
+                lossProgress,
+
+                startedAt,
+                finishedAt,
+
+                isActive: cycleStatus === "ACTIVE",
+                isTakeProfit: cycleStatus === "TAKE_PROFIT",
+                isLossLimit: cycleStatus === "LOSS_LIMIT"
             };
-        }
-
-        /*
-         * Inicia un nuevo ciclo con el balance restante.
-         * El número de ciclo aumenta.
-         */
-
-        function resetCycle(remainingBalance) {
-
-            cycleNumber++;
-
-            return startCycle(remainingBalance);
         }
 
         return {
             startCycle,
-            recordTrade,
             updateCycleProfitLoss,
-            getStatus,
-            resetCycle
+            resetCycle,
+            getStatus
         };
     }
 
-    const testManager = createManager();
-
     return {
         createManager,
-
-        startCycle: testManager.startCycle,
-        recordTrade: testManager.recordTrade,
-
-        updateCycleProfitLoss:
-            testManager.updateCycleProfitLoss,
-
-        getStatus: testManager.getStatus,
-        resetCycle: testManager.resetCycle
+        CONFIG: { ...CONFIG }
     };
 
 })();
