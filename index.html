@@ -716,24 +716,19 @@ function startRobot() {
     // Iniciar el motor central
     TradeEngine.start(balance);
 
-    // Activar análisis automático
-    const result = TradeEngine.startAuto(
-        function(pair) {
-            return Promise.resolve(
-                generateTestCandles(pair)
-            );
-        },
+    // Activar análisis automático cada 30 segundos
+    const resultado = TradeEngine.startAuto(
+        generateTestCandles,
         30
     );
 
-    if (!result.success) {
+    if (!resultado.success) {
 
         robotActivo = false;
-        TradeEngine.stop();
 
         escribirLog(
-            "No se pudo iniciar el análisis: " +
-            result.reason
+            "No se pudo iniciar el motor: " +
+            resultado.reason
         );
 
         updateUI();
@@ -741,14 +736,11 @@ function startRobot() {
     }
 
     escribirLog(
-        "Robot activado. Análisis automático iniciado."
+        "Robot activado. Análisis y gestión automáticos iniciados."
     );
 
     updateUI();
-    updateEngineTest();
 }
-
-
 
 function stopRobot() {
 
@@ -757,11 +749,10 @@ function stopRobot() {
     TradeEngine.stop();
 
     escribirLog(
-        "Robot detenido. Análisis automático finalizado. Las operaciones abiertas no se cierran automáticamente."
+        "Robot detenido. El análisis automático se ha cancelado."
     );
 
     updateUI();
-    updateEngineTest();
 }
 
 
