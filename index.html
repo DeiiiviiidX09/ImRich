@@ -559,7 +559,9 @@ input, select {
     </div>
 
 </div>
-
+<script src="signals.js"></script>
+<script src="risk.js"></script>
+<script src="trade-engine.js"></script>
 <script>
 
 
@@ -699,20 +701,68 @@ function updateUI() {
     saveState();
 }
 
+
 function startRobot() {
+
+    if (robotActivo) {
+        escribirLog("El robot ya está activo.");
+        return;
+    }
+
     emergencia = false;
     robotActivo = true;
 
-    escribirLog("Robot activado en modo de simulación.");
+    // Iniciar el motor central
+    TradeEngine.start(balance);
+
+    // Activar análisis automático
+    const result = TradeEngine.startAuto(
+        function(pair) {
+            return Promise.resolve(
+                generateTestCandles(pair)
+            );
+        },
+        30
+    );
+
+    if (!result.success) {
+
+        robotActivo = false;
+        TradeEngine.stop();
+
+        escribirLog(
+            "No se pudo iniciar el análisis: " +
+            result.reason
+        );
+
+        updateUI();
+        return;
+    }
+
+    escribirLog(
+        "Robot activado. Análisis automático iniciado."
+    );
+
     updateUI();
+    updateEngineTest();
 }
+
+
 
 function stopRobot() {
+
     robotActivo = false;
 
-    escribirLog("Robot detenido. Las operaciones abiertas no se cierran automáticamente.");
+    TradeEngine.stop();
+
+    escribirLog(
+        "Robot detenido. Análisis automático finalizado. Las operaciones abiertas no se cierran automáticamente."
+    );
+
     updateUI();
+    updateEngineTest();
 }
+
 
 function emergencyStop() {
     robotActivo = false;
@@ -1128,8 +1178,5 @@ updateUI();
 
 
 </script>
-<script src="signals.js"></script>
-<script src="risk.js"></script>
-<script src="trade-engine.js"></script>
 </body>
 </html>
