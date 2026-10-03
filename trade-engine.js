@@ -1,5 +1,5 @@
 /*
- * TRADE AI
+ * TRADE A
  * Motor central v1.0
  * Coordina señales y riesgo.
  * Solo simulación.
