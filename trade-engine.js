@@ -16,8 +16,8 @@ let lifetimeManualLosses = 0;
     let lastCycleEndTime = 0;
     let cooldownMs = 30000;
 
-    const MAX_POSITIONS = 3;
-    const POSITION_FRACTION = 0.33;
+    const MAX_POSITIONS = 10;
+    const POSITION_FRACTION = 0.10;
 
     function log(message, type = "info") {
         const entry = {
