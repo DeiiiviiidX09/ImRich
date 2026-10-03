@@ -72,8 +72,6 @@ const TradeEngine = (() => {
     function finishCycle(reason) {
         if (!risk) return;
 
-        stopAuto();
-
         const openPositions = getCurrentCyclePositions();
 
         if (openPositions.length > 0) {
