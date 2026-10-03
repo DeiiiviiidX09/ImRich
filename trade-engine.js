@@ -78,52 +78,59 @@ const RESTART_COOLDOWN_MS = 60000;
     }
 
     // Cerrar el ciclo y liquidar posiciones restantes
-    function finishCycle(cycleStatus) {
 
-        if (
-            engineStatus === "WAITING" ||
-            engineStatus === "RESTART_REQUIRED"
-        ) {
-            return;
-        }
+function finishCycle(cycleStatus) {
 
-        const remaining =
-            PositionManager.closeAll(
-                cycleStatus === "TAKE_PROFIT"
-                    ? "CYCLE_TAKE_PROFIT"
-                    : "CYCLE_LOSS_LIMIT"
-            );
-
-        remaining.forEach(position => {
-
-            logDecision(
-                position.pair +
-                " cerrada por límite global. Resultado: " +
-                (position.profitLoss >= 0 ? "+" : "") +
-                "$" + position.profitLoss.toFixed(2)
-            );
-
-        });
-
-        if (cycleStatus === "TAKE_PROFIT") {
-
-            engineStatus = "WAITING";
-
-            logDecision(
-                "Objetivo del ciclo alcanzado. " +
-                "Esperando una nueva señal válida."
-            );
-
-        } else {
-
-            engineStatus = "RESTART_REQUIRED";
-
-            logDecision(
-                "Límite de pérdidas alcanzado. " +
-                "Posiciones cerradas. Esperando condiciones adecuadas."
-            );
-        }
+    if (
+        engineStatus === "WAITING" ||
+        engineStatus === "RESTART_REQUIRED"
+    ) {
+        return;
     }
+
+    cycleEndedThisRun = true;
+
+    nextRestartAllowedAt =
+        Date.now() + RESTART_COOLDOWN_MS;
+
+    const remaining =
+        PositionManager.closeAll(
+            cycleStatus === "TAKE_PROFIT"
+                ? "CYCLE_TAKE_PROFIT"
+                : "CYCLE_LOSS_LIMIT"
+        );
+
+    remaining.forEach(position => {
+
+        logDecision(
+            position.pair +
+            " cerrada por límite global. Resultado: " +
+            (position.profitLoss >= 0 ? "+" : "") +
+            "$" + position.profitLoss.toFixed(2)
+        );
+
+    });
+
+    if (cycleStatus === "TAKE_PROFIT") {
+
+        engineStatus = "WAITING";
+
+        logDecision(
+            "Objetivo alcanzado. Todas las posiciones cerradas. " +
+            "Pausa de seguridad de 60 segundos."
+        );
+
+    } else {
+
+        engineStatus = "RESTART_REQUIRED";
+
+        logDecision(
+            "Límite de pérdidas alcanzado. Todas las posiciones cerradas. " +
+            "Pausa de seguridad de 60 segundos antes de buscar otro ciclo."
+        );
+    }
+}
+
 
     // Actualizar el gestor de riesgo
     function updateRiskControl() {
