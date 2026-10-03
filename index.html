@@ -1262,7 +1262,6 @@ function resetRiskTest() {
 ========================================= */
 
 function startEngineTest() {
-
     const result = TradeEngine.start(balance);
 
     if (!result.success) {
@@ -1279,7 +1278,7 @@ function startEngineTest() {
         TradeEngine.stop();
 
         alert(
-            "No se pudo activar el análisis automático: " +
+            "No se pudo iniciar el análisis automático: " +
             autoResult.reason
         );
 
