@@ -12,7 +12,7 @@ const TradeRisk = (() => {
         const CONFIG = {
             profitTarget: 0.03,
             maxLoss: 0.01,
-            leverage: 10
+            leverage: 3
         };
 
         let cycleStartBalance = 100;
