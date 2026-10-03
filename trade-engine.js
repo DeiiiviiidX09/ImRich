@@ -318,12 +318,38 @@ function finishCycle(cycleStatus) {
 
         const status = risk.getStatus();
 
-        if (
-            engineStatus !== "WAITING" &&
-            engineStatus !== "RESTART_REQUIRED"
-        ) {
-            return getStatus();
-        }
+      
+if (
+    engineStatus === "WAITING" ||
+    engineStatus === "RESTART_REQUIRED"
+) {
+
+    // No reiniciar durante la pausa de seguridad
+    if (Date.now() < nextRestartAllowedAt) {
+        continue;
+    }
+
+    const preview =
+        TradeAI.analyze(candles);
+
+    if (
+        preview.signal === "BUY" ||
+        preview.signal === "SELL"
+    ) {
+
+        logDecision(
+            "Nueva señal válida detectada en " +
+            pair + ". Reiniciando ciclo."
+        );
+
+        restartCycle();
+
+    } else {
+
+        continue;
+    }
+}
+
 
         if (status.currentBalance <= 0) {
 
