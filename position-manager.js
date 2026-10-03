@@ -13,9 +13,9 @@ const PositionManager = (() => {
 
     const CONFIG = {
         maxPositions: 20,
-        leverage: 1,
-        takeProfitPercent: 1,
-        stopLossPercent: 1
+        leverage: 30,
+        takeProfitPercent: 0.20,
+        stopLossPercent: 5
     };
 
     // Contar solamente posiciones abiertas
