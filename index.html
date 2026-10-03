@@ -1,203 +1,215 @@
+
 <!DOCTYPE html>
-
 <html lang="es">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Trade AI</title>
 
 <style>
-
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
-
     margin: 0;
-
     background: #080b10;
-
     color: white;
-
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
 }
 
 .app {
-
     max-width: 600px;
-
     margin: auto;
-
     padding: 22px;
-
 }
 
-.header { margin-bottom: 25px; }
+.header {
+    margin-bottom: 25px;
+}
 
-.header h1 { margin: 0; font-size: 34px; }
+.header h1 {
+    margin: 0;
+    font-size: 34px;
+}
 
-.header p { color: #8993a3; margin-top: 5px; }
+.header p {
+    color: #8993a3;
+    margin-top: 5px;
+}
 
 .card {
-
     background: #141922;
-
     border-radius: 20px;
-
     padding: 20px;
-
     margin-bottom: 15px;
-
     border: 1px solid #222a36;
-
 }
 
 .label {
-
     color: #8993a3;
-
     font-size: 13px;
-
 }
 
 .balance {
-
     font-size: 38px;
-
     font-weight: 700;
-
     margin-top: 5px;
-
 }
 
 .status {
-
     display: flex;
-
     align-items: center;
-
     gap: 8px;
-
     margin-bottom: 20px;
-
 }
 
 .status-dot {
-
     width: 10px;
-
     height: 10px;
-
     border-radius: 50%;
-
     background: #777;
-
 }
 
-.status-text { font-size: 14px; }
+.status-text {
+    font-size: 14px;
+}
 
 .grid {
-
     display: grid;
-
     grid-template-columns: 1fr 1fr;
-
     gap: 12px;
-
 }
 
 .metric {
-
     background: #1b222d;
-
     padding: 15px;
-
     border-radius: 15px;
-
+    min-width: 0;
 }
 
 .metric-value {
-
     font-size: 22px;
-
     font-weight: 700;
-
     margin-top: 5px;
-
+    overflow-wrap: anywhere;
 }
 
-button, select, input {
-
+button,
+select,
+input {
     width: 100%;
-
     padding: 15px;
-
     border: 0;
-
     border-radius: 12px;
-
     margin-top: 10px;
-
     font-size: 16px;
-
 }
 
-button { font-weight: 700; cursor: pointer; }
+button {
+    font-weight: 700;
+    cursor: pointer;
+}
 
-button:disabled { opacity: .35; }
+button:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
 
-.start { background: white; color: black; }
+.start {
+    background: white;
+    color: black;
+}
 
-.stop { background: #292f39; color: white; }
-
-.emergency { background: #451b1b; color: #ff7777; }
-
-.buy { background: #145b3b; color: #75f0ae; }
-
-.sell { background: #612626; color: #ffaaaa; }
-
-.simulate { background: #28364d; color: #d7e5ff; }
-
-.reset { background: #292f39; color: white; }
-
-input, select {
-
-    background: #252d39;
-
+.stop {
+    background: #292f39;
     color: white;
+}
 
+.emergency {
+    background: #451b1b;
+    color: #ff7777;
+}
+
+.buy {
+    background: #145b3b;
+    color: #75f0ae;
+}
+
+.sell {
+    background: #612626;
+    color: #ffaaaa;
+}
+
+.simulate {
+    background: #28364d;
+    color: #d7e5ff;
+}
+
+.reset {
+    background: #292f39;
+    color: white;
+}
+
+input,
+select {
+    background: #252d39;
+    color: white;
     border: 1px solid #394454;
-
 }
 
 .operation {
-
     display: flex;
-
     justify-content: space-between;
-
     gap: 10px;
-
     padding: 15px 0;
-
     border-bottom: 1px solid #252c36;
-
+    overflow-wrap: anywhere;
 }
 
-.profit { color: #50d890; }
+.profit {
+    color: #50d890;
+}
 
-.loss { color: #ff6262; }
+.loss {
+    color: #ff6262;
+}
 
-.log { color: #aab4c2; font-size: 13px; line-height: 1.8; }
+.log {
+    color: #aab4c2;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
 
-.small { color: #8993a3; font-size: 12px; line-height: 1.5; }
+.small {
+    color: #8993a3;
+    font-size: 12px;
+    line-height: 1.5;
+}
 
+h2 {
+    margin-top: 0;
+}
+
+h3 {
+    margin-top: 25px;
+}
+
+@media (max-width: 380px) {
+    .app {
+        padding: 12px;
+    }
+
+    .metric-value {
+        font-size: 18px;
+    }
+
+    .balance {
+        font-size: 32px;
+    }
+}
 </style>
-
 </head>
 
 <body>
@@ -205,388 +217,427 @@ input, select {
 <div class="app">
 
     <div class="header">
-
         <h1>Trade AI</h1>
-
         <p>Forex Automated Trading · Simulador</p>
-
     </div>
+
+    <!-- PANEL PRINCIPAL -->
 
     <div class="card">
 
         <div class="status">
-
             <div class="status-dot" id="statusDot"></div>
-
             <div class="status-text" id="statusText">Robot detenido</div>
-
         </div>
 
         <div class="label">Capital de simulación</div>
-
         <div class="balance" id="balance">$100.00</div>
 
         <div class="grid" style="margin-top:20px">
 
             <div class="metric">
-
                 <div class="label">Ganancia / pérdida</div>
-
                 <div class="metric-value" id="totalPL">$0.00</div>
-
             </div>
 
             <div class="metric">
-
                 <div class="label">Operaciones cerradas</div>
-
                 <div class="metric-value" id="closedCount">0</div>
-
             </div>
 
         </div>
 
-        <button class="start" onclick="startRobot()">ACTIVAR ROBOT</button>
+        <button class="start" onclick="startRobot()">
+            ACTIVAR ROBOT
+        </button>
 
-        <button class="stop" onclick="stopRobot()">DETENER ROBOT</button>
+        <button class="stop" onclick="stopRobot()">
+            DETENER ROBOT
+        </button>
 
-        <button class="emergency" onclick="emergencyStop()">PARADA DE EMERGENCIA</button>
+        <button class="emergency" onclick="emergencyStop()">
+            PARADA DE EMERGENCIA
+        </button>
 
     </div>
+
+    <!-- OBJETIVOS -->
 
     <div class="grid">
 
         <div class="metric">
-
-            <div class="label">Take Profit</div>
-
-            <div class="metric-value profit">+10%</div>
-
+            <div class="label">Take Profit individual</div>
+            <div class="metric-value profit">+0,20%</div>
         </div>
 
         <div class="metric">
-
-            <div class="label">Stop Loss</div>
-
-            <div class="metric-value loss">-20%</div>
-
+            <div class="label">Stop Loss individual</div>
+            <div class="metric-value loss">−5%</div>
         </div>
 
     </div>
 
+    <!-- OPERACIÓN MANUAL -->
+
     <div class="card">
 
-        <h2>Nueva operación</h2>
+        <h2>Nueva operación manual</h2>
 
-        <label class="label" for="pair">Par de divisas</label>
+        <label class="label" for="pair">
+            Par de divisas
+        </label>
 
         <select id="pair">
-
             <option>EUR/USD</option>
-
             <option>GBP/USD</option>
-
             <option>USD/JPY</option>
-
         </select>
 
-        <label class="label" for="direction">Dirección</label>
+        <label class="label" for="direction">
+            Dirección
+        </label>
 
         <select id="direction">
-
             <option value="Compra">Compra (Buy)</option>
-
             <option value="Venta">Venta (Sell)</option>
-
         </select>
 
-        <label class="label" for="amount">Cantidad invertida (USD)</label>
+        <label class="label" for="amount">
+            Cantidad invertida (USD)
+        </label>
 
-        <input id="amount" type="number" min="1" step="1" value="10">
+        <input
+            id="amount"
+            type="number"
+            min="1"
+            step="1"
+            value="10"
+        >
 
-        <button class="buy" id="openBtn" onclick="openTrade()">ABRIR OPERACIÓN</button>
+        <button class="buy" id="openBtn" onclick="openTrade()">
+            ABRIR OPERACIÓN
+        </button>
 
-        <p class="small">Solo se permite una operación abierta a la vez en esta versión de prueba.</p>
+        <p class="small">
+            Esta sección es una simulación manual independiente
+            del motor autónomo.
+        </p>
 
     </div>
+
+    <!-- OPERACIÓN MANUAL ACTIVA -->
 
     <div class="card">
 
         <h2>Operación activa</h2>
 
-        <div id="activeTrade">No hay ninguna operación abierta.</div>
-
-        <button class="simulate" id="tpBtn" onclick="simulateResult(10)" disabled>
-
-            SIMULAR TAKE PROFIT (+10%)
-
-        </button>
-
-        <button class="simulate" id="slBtn" onclick="simulateResult(-20)" disabled>
-
-            SIMULAR STOP LOSS (-20%)
-
-        </button>
-
-        <p class="small">Estos botones simulan que el mercado ha alcanzado el objetivo o el límite de pérdida. No representan precios de mercado reales.</p>
-
-    </div>
-
-<div class="card">
-
-    <h2>Análisis del mercado</h2>
-
-    <p class="small">
-        Motor de señales Trade AI · Simulación
-    </p>
-
-    <label class="label" for="analysisPair">
-        Par de divisas
-    </label>
-
-    <select id="analysisPair">
-        <option value="EUR/USD">EUR/USD</option>
-        <option value="GBP/USD">GBP/USD</option>
-        <option value="USD/JPY">USD/JPY</option>
-    </select>
-
-    <button class="simulate" onclick="analyzeMarket()">
-        ANALIZAR MERCADO
-    </button>
-
-    <div class="metric" style="margin-top:15px">
-
-        <div class="label">Señal detectada</div>
-
-        <div class="metric-value" id="marketSignal">
-            ESPERANDO ANÁLISIS
+        <div id="activeTrade">
+            No hay ninguna operación abierta.
         </div>
 
-        <p class="small" id="signalReason">
-            Pulsa analizar para comenzar.
+        <button
+            class="simulate"
+            id="tpBtn"
+            onclick="simulateResult(0.20)"
+            disabled
+        >
+            SIMULAR TAKE PROFIT (+0,20%)
+        </button>
+
+        <button
+            class="simulate"
+            id="slBtn"
+            onclick="simulateResult(-5)"
+            disabled
+        >
+            SIMULAR STOP LOSS (-5%)
+        </button>
+
+        <p class="small">
+            Estos botones simulan el resultado de una operación.
+            No representan precios de mercado reales.
         </p>
 
     </div>
 
-
-<div class="grid" style="margin-top:12px">
-
-    <div class="metric">
-        <div class="label">Capital del ciclo</div>
-        <div class="metric-value" id="engineBalance">
-            $100.00
-        </div>
-    </div>
-
-    <div class="metric">
-        <div class="label">Balance neto acumulado</div>
-        <div class="metric-value" id="enginePL">
-            $0.00
-        </div>
-    </div>
-
-    <div class="metric">
-        <div class="label">Ganancias totales</div>
-        <div class="metric-value profit" id="engineWins">
-            $0.00
-        </div>
-    </div>
-
-    <div class="metric">
-        <div class="label">Pérdidas totales</div>
-        <div class="metric-value loss" id="engineLosses">
-            $0.00
-        </div>
-    </div>
-
-</div>
-
-
-    <p class="small">
-        Los valores mostrados son simulados y no deben utilizarse
-        para tomar decisiones de inversión.
-    </p>
-
-</div>
+    <!-- ANÁLISIS -->
 
     <div class="card">
 
-<div class="card">
+        <h2>Análisis del mercado</h2>
 
-<div class="card">
+        <p class="small">
+            Motor de señales Trade AI · Simulación
+        </p>
 
-    <h2>Motor autónomo Trade AI</h2>
+        <label class="label" for="analysisPair">
+            Par de divisas
+        </label>
 
-    <p class="small">
-        Centro de control y pruebas integradas.
-    </p>
+        <select id="analysisPair">
+            <option value="EUR/USD">EUR/USD</option>
+            <option value="GBP/USD">GBP/USD</option>
+            <option value="USD/JPY">USD/JPY</option>
+        </select>
 
-    <div class="metric">
-        <div class="label">Estado del motor</div>
-        <div class="metric-value" id="engineStatus">
-            DETENIDO
+        <button class="simulate" onclick="analyzeMarket()">
+            ANALIZAR MERCADO
+        </button>
+
+        <div class="metric" style="margin-top:15px">
+
+            <div class="label">Señal detectada</div>
+
+            <div class="metric-value" id="marketSignal">
+                ESPERANDO ANÁLISIS
+            </div>
+
+            <p class="small" id="signalReason">
+                Pulsa analizar para comenzar.
+            </p>
+
+            <p class="small" id="marketPrice">
+                Precio: pendiente
+            </p>
+
         </div>
+
+        <div class="grid" style="margin-top:12px">
+
+            <div class="metric">
+                <div class="label">Capital del ciclo</div>
+                <div class="metric-value" id="analysisBalance">
+                    $100.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Balance neto acumulado</div>
+                <div class="metric-value" id="analysisPL">
+                    $0.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Ganancias totales</div>
+                <div class="metric-value profit" id="analysisWins">
+                    $0.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Pérdidas totales</div>
+                <div class="metric-value loss" id="analysisLosses">
+                    $0.00
+                </div>
+            </div>
+
+        </div>
+
+        <p class="small">
+            Los valores mostrados son simulados y no deben
+            utilizarse para tomar decisiones de inversión.
+        </p>
+
     </div>
 
-    <div class="grid" style="margin-top:12px">
+    <!-- MOTOR AUTÓNOMO -->
+
+    <div class="card">
+
+        <h2>Motor autónomo Trade AI</h2>
+
+        <p class="small">
+            Centro de control y pruebas integradas.
+        </p>
 
         <div class="metric">
-            <div class="label">Capital del ciclo</div>
-            <div class="metric-value" id="engineBalance">
-                $100.00
+            <div class="label">Estado del motor</div>
+            <div class="metric-value" id="engineStatus">
+                DETENIDO
             </div>
         </div>
 
+        <div class="grid" style="margin-top:12px">
+
+            <div class="metric">
+                <div class="label">Capital del ciclo</div>
+                <div class="metric-value" id="engineBalance">
+                    $100.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Resultado acumulado</div>
+                <div class="metric-value" id="enginePL">
+                    $0.00
+                </div>
+            </div>
+
+        </div>
+
+        <button class="start" onclick="startEngineTest()">
+            INICIAR MOTOR
+        </button>
+
+        <button class="stop" onclick="stopEngineTest()">
+            DETENER MOTOR
+        </button>
+
+        <button class="simulate" onclick="analyzeEngineTest()">
+            ANALIZAR LOS TRES PARES
+        </button>
+
+        <button class="buy" onclick="simulateEngineProfit()">
+            SIMULAR GANANCIA (+$1)
+        </button>
+
+        <button class="sell" onclick="simulateEngineLoss()">
+            SIMULAR PÉRDIDA (-$0.50)
+        </button>
+
+        <button class="reset" onclick="restartEngineTest()">
+            REINICIAR CICLO
+        </button>
+
+        <h3>Señales detectadas</h3>
+
+        <div id="engineSignals" class="log">
+            Esperando análisis.
+        </div>
+
+        <h3>Posiciones abiertas</h3>
+
+        <div id="enginePositions" class="log">
+            No hay posiciones abiertas.
+        </div>
+
+        <h3>Historial de posiciones cerradas</h3>
+
+        <div id="enginePositionHistory" class="log">
+            Todavía no hay posiciones cerradas.
+        </div>
+
+        <h3>Registro de decisiones</h3>
+
+        <div id="engineLog" class="log">
+            Motor preparado.
+        </div>
+
+        <p class="small">
+            Prueba con datos artificiales. No se ejecutan órdenes reales.
+        </p>
+
+    </div>
+
+    <!-- GESTOR DE RIESGO -->
+
+    <div class="card">
+
+        <h2>Prueba del gestor de riesgo</h2>
+
+        <p class="small">
+            Panel de diagnóstico. No modifica el saldo principal
+            ni ejecuta operaciones reales.
+        </p>
+
         <div class="metric">
-            <div class="label">Resultado acumulado</div>
-            <div class="metric-value" id="enginePL">
-                $0.00
+            <div class="label">Estado del ciclo</div>
+            <div class="metric-value" id="riskStatus">
+                ACTIVO
             </div>
         </div>
 
-    </div>
+        <div class="grid" style="margin-top:12px">
 
-    <button class="start" onclick="startEngineTest()">
-        INICIAR MOTOR
-    </button>
-
-    <button class="stop" onclick="stopEngineTest()">
-        DETENER MOTOR
-    </button>
-
-    <button class="simulate" onclick="analyzeEngineTest()">
-        ANALIZAR LOS TRES PARES
-    </button>
-
-    <button class="buy" onclick="simulateEngineProfit()">
-        SIMULAR GANANCIA (+$1)
-    </button>
-
-    <button class="sell" onclick="simulateEngineLoss()">
-        SIMULAR PÉRDIDA (-$0.50)
-    </button>
-
-    <button class="reset" onclick="restartEngineTest()">
-        REINICIAR CICLO
-    </button>
-
-    <h3>Señales detectadas</h3>
-
-    <div id="engineSignals" class="log">
-        Esperando análisis.
-    </div>
-
-<h3>Posiciones abiertas</h3>
-
-<div id="enginePositions" class="log">
-    No hay posiciones abiertas.
-</div>
-
-<h3>Historial de posiciones cerradas</h3>
-
-<div id="enginePositionHistory" class="log">
-    Todavía no hay posiciones cerradas.
-</div>
-
-    <h3>Registro de decisiones</h3>
-
-    <div id="engineLog" class="log">
-        Motor preparado.
-    </div>
-
-    <p class="small">
-        Prueba con datos artificiales. No se ejecutan órdenes reales.
-    </p>
-
-</div>
-
-    <h2>Prueba del gestor de riesgo</h2>
-
-    <p class="small">
-        Panel de diagnóstico. No modifica el saldo principal
-        ni ejecuta operaciones reales.
-    </p>
-
-    <div class="metric">
-        <div class="label">Estado del ciclo</div>
-        <div class="metric-value" id="riskStatus">
-            ACTIVO
-        </div>
-    </div>
-
-    <div class="grid" style="margin-top:12px">
-
-        <div class="metric">
-            <div class="label">Capital inicial</div>
-            <div class="metric-value" id="riskStart">
-                $100.00
+            <div class="metric">
+                <div class="label">Capital inicial</div>
+                <div class="metric-value" id="riskStart">
+                    $100.00
+                </div>
             </div>
+
+            <div class="metric">
+                <div class="label">Capital actual</div>
+                <div class="metric-value" id="riskBalance">
+                    $100.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Resultado del ciclo</div>
+                <div class="metric-value" id="riskPL">
+                    $0.00
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="label">Acción recomendada</div>
+                <div class="metric-value" id="riskAction">
+                    CONTINUE
+                </div>
+            </div>
+
         </div>
 
-        <div class="metric">
-            <div class="label">Capital actual</div>
-            <div class="metric-value" id="riskBalance">
-                $100.00
-            </div>
-        </div>
+        <button class="buy" onclick="testRiskProfit()">
+            SIMULAR GANANCIA (+$1)
+        </button>
 
-        <div class="metric">
-            <div class="label">Resultado del ciclo</div>
-            <div class="metric-value" id="riskPL">
-                $0.00
-            </div>
-        </div>
+        <button class="sell" onclick="testRiskLoss()">
+            SIMULAR PÉRDIDA (-$0.50)
+        </button>
 
-        <div class="metric">
-            <div class="label">Acción recomendada</div>
-            <div class="metric-value" id="riskAction">
-                CONTINUE
-            </div>
+        <button class="reset" onclick="resetRiskTest()">
+            REINICIAR PRUEBA
+        </button>
+
+        <p class="small" id="riskMessage">
+            Prueba preparada. Capital inicial: $100.
+        </p>
+
+    </div>
+
+    <!-- HISTORIAL MANUAL -->
+
+    <div class="card">
+
+        <h2>Historial de operaciones manuales</h2>
+
+        <div id="history" class="log">
+            Todavía no hay operaciones.
         </div>
 
     </div>
 
-    <button class="buy" onclick="testRiskProfit()">
-        SIMULAR GANANCIA (+$1)
-    </button>
-
-    <button class="sell" onclick="testRiskLoss()">
-        SIMULAR PÉRDIDA (-$0.50)
-    </button>
-
-    <button class="reset" onclick="resetRiskTest()">
-        REINICIAR PRUEBA
-    </button>
-
-    <p class="small" id="riskMessage">
-        Prueba preparada. Capital inicial: $100.
-    </p>
-
-</div>
-
-        <h2>Historial de operaciones</h2>
-
-        <div id="history" class="log">Todavía no hay operaciones.</div>
-
-    </div>
+    <!-- REGISTRO -->
 
     <div class="card">
 
         <h2>Registro del robot</h2>
 
-        <div id="log" class="log">Sistema preparado. Esperando activación.</div>
+        <div id="log" class="log">
+            Sistema preparado. Esperando activación.
+        </div>
 
-        <button class="reset" onclick="resetSimulation()">REINICIAR SIMULACIÓN</button>
+        <button class="reset" onclick="resetSimulation()">
+            REINICIAR SIMULACIÓN
+        </button>
 
     </div>
 
 </div>
+
 <script src="signals.js"></script>
 <script src="risk.js"></script>
 <script src="position-manager.js"></script>
 <script src="trade-engine.js"></script>
 
 <script>
+/* =========================================
+   ESTADO DE LA SIMULACIÓN MANUAL
+========================================= */
+
 let balance = 100;
 let totalPL = 0;
 let closedCount = 0;
@@ -595,7 +646,124 @@ let emergencia = false;
 let activeTrade = null;
 let history = [];
 
-const STORAGE_KEY = "tradeAI_simulation_v1";
+const STORAGE_KEY = "tradeAI_simulation_v2";
+
+/* =========================================
+   PRECIOS SIMULADOS CONTINUOS
+========================================= */
+
+const simulatedMarkets = {};
+
+const basePrices = {
+    "EUR/USD": 1.1000,
+    "GBP/USD": 1.2700,
+    "USD/JPY": 150.00
+};
+
+function generateTestCandles(pair) {
+    if (!simulatedMarkets[pair]) {
+        let price = basePrices[pair] || 1.1000;
+        const candles = [];
+
+        // Crear el historial inicial una sola vez.
+        for (let i = 0; i < 100; i++) {
+            const movement =
+                (Math.random() - 0.5) * 0.00012;
+
+            const open = price;
+            const close = open * (1 + movement);
+
+            const high =
+                Math.max(open, close) *
+                (1 + Math.random() * 0.00002);
+
+            const low =
+                Math.min(open, close) *
+                (1 - Math.random() * 0.00002);
+
+            candles.push({
+                open,
+                high,
+                low,
+                close
+            });
+
+            price = close;
+        }
+
+        simulatedMarkets[pair] = candles;
+
+        return candles.map(candle => ({ ...candle }));
+    }
+
+    // Continuar desde el último precio conocido.
+    const candles = simulatedMarkets[pair];
+
+    const previousClose =
+        candles[candles.length - 1].close;
+
+    const movement =
+        (Math.random() - 0.5) * 0.00012;
+
+    const open = previousClose;
+    const close = open * (1 + movement);
+
+    const high =
+        Math.max(open, close) *
+        (1 + Math.random() * 0.00002);
+
+    const low =
+        Math.min(open, close) *
+        (1 - Math.random() * 0.00002);
+
+    candles.push({
+        open,
+        high,
+        low,
+        close
+    });
+
+    // Mantener las últimas 100 velas.
+    if (candles.length > 100) {
+        candles.shift();
+    }
+
+    return candles.map(candle => ({ ...candle }));
+}
+
+/* =========================================
+   FORMATO DE VALORES
+========================================= */
+
+function money(value) {
+    return "$" + Number(value || 0).toFixed(2);
+}
+
+function preciseMoney(value) {
+    return "$" + Number(value || 0).toFixed(4);
+}
+
+function signedMoney(value) {
+    const number = Number(value || 0);
+
+    return (number >= 0 ? "+" : "-") +
+        preciseMoney(Math.abs(number));
+}
+
+function escribirLog(texto) {
+    const log = document.getElementById("log");
+
+    if (!log) return;
+
+    const hora = new Date().toLocaleTimeString();
+
+    log.innerHTML =
+        "[" + hora + "] " + texto + "<br>" + log.innerHTML;
+}
+
+/* =========================================
+   GUARDADO Y RECUPERACIÓN
+========================================= */
 
 function saveState() {
     const state = {
@@ -609,103 +777,164 @@ function saveState() {
     };
 
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(state)
+        );
     } catch (error) {
-        console.error("No se pudo guardar el progreso:", error);
+        console.error(
+            "No se pudo guardar el progreso:",
+            error
+        );
     }
 }
 
 function loadState() {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
+
         if (!saved) return;
 
         const state = JSON.parse(saved);
 
-        if (typeof state.balance === "number") balance = state.balance;
-        if (typeof state.totalPL === "number") totalPL = state.totalPL;
-        if (typeof state.closedCount === "number") closedCount = state.closedCount;
+        if (typeof state.balance === "number") {
+            balance = state.balance;
+        }
+
+        if (typeof state.totalPL === "number") {
+            totalPL = state.totalPL;
+        }
+
+        if (typeof state.closedCount === "number") {
+            closedCount = state.closedCount;
+        }
 
         robotActivo = false;
         emergencia = Boolean(state.emergencia);
         activeTrade = state.activeTrade || null;
-        history = Array.isArray(state.history) ? state.history : [];
+        history = Array.isArray(state.history)
+            ? state.history
+            : [];
+
     } catch (error) {
-        console.error("No se pudieron recuperar los datos:", error);
+        console.error(
+            "No se pudieron recuperar los datos:",
+            error
+        );
     }
 }
 
-function money(value) {
-    return "$" + Number(value || 0).toFixed(2);
-}
-
-function escribirLog(texto) {
-    const log = document.getElementById("log");
-    if (!log) return;
-
-    const hora = new Date().toLocaleTimeString();
-    log.innerHTML = "[" + hora + "] " + texto + "<br>" + log.innerHTML;
-}
+/* =========================================
+   INTERFAZ PRINCIPAL
+========================================= */
 
 function updateUI() {
-    document.getElementById("balance").textContent = money(balance);
+    document.getElementById("balance").textContent =
+        money(balance);
 
     const pl = document.getElementById("totalPL");
-    pl.textContent = (totalPL >= 0 ? "+" : "") + money(totalPL);
-    pl.className = "metric-value " + (totalPL >= 0 ? "profit" : "loss");
 
-    document.getElementById("closedCount").textContent = closedCount;
+    pl.textContent = signedMoney(totalPL);
+    pl.className =
+        "metric-value " +
+        (totalPL >= 0 ? "profit" : "loss");
+
+    document.getElementById("closedCount").textContent =
+        closedCount;
 
     document.getElementById("statusText").textContent =
-        emergencia ? "PARADA DE EMERGENCIA" :
-        robotActivo ? "Robot activo" : "Robot detenido";
+        emergencia
+            ? "PARADA DE EMERGENCIA"
+            : robotActivo
+                ? "Robot activo"
+                : "Robot detenido";
 
     document.getElementById("statusDot").style.background =
-        emergencia ? "#ff4444" :
-        robotActivo ? "#50d890" : "#777";
+        emergencia
+            ? "#ff4444"
+            : robotActivo
+                ? "#50d890"
+                : "#777";
 
-    const active = document.getElementById("activeTrade");
+    const active =
+        document.getElementById("activeTrade");
 
     if (activeTrade) {
-        active.innerHTML =
-            "<div class='operation'><span>Par</span><strong>" +
-            activeTrade.pair + "</strong></div>" +
-            "<div class='operation'><span>Dirección</span><strong>" +
-            activeTrade.direction + "</strong></div>" +
-            "<div class='operation'><span>Invertido</span><strong>" +
-            money(activeTrade.amount) + "</strong></div>" +
-            "<div class='operation'><span>Objetivo de ganancia</span><strong class='profit'>+" +
-            money(activeTrade.amount * 0.10) + "</strong></div>" +
-            "<div class='operation'><span>Límite de pérdida</span><strong class='loss'>-" +
-            money(activeTrade.amount * 0.20) + "</strong></div>";
+        active.innerHTML = `
+            <div class="operation">
+                <span>Par</span>
+                <strong>${activeTrade.pair}</strong>
+            </div>
+
+            <div class="operation">
+                <span>Dirección</span>
+                <strong>${activeTrade.direction}</strong>
+            </div>
+
+            <div class="operation">
+                <span>Invertido</span>
+                <strong>${money(activeTrade.amount)}</strong>
+            </div>
+
+            <div class="operation">
+                <span>Objetivo de ganancia</span>
+                <strong class="profit">
+                    +${preciseMoney(activeTrade.amount * 0.002)}
+                </strong>
+            </div>
+
+            <div class="operation">
+                <span>Límite de pérdida</span>
+                <strong class="loss">
+                    -${preciseMoney(activeTrade.amount * 0.05)}
+                </strong>
+            </div>
+        `;
     } else {
-        active.textContent = "No hay ninguna operación abierta.";
+        active.textContent =
+            "No hay ninguna operación abierta.";
     }
 
-    document.getElementById("tpBtn").disabled = !activeTrade;
-    document.getElementById("slBtn").disabled = !activeTrade;
-    document.getElementById("openBtn").disabled = !!activeTrade || emergencia;
+    document.getElementById("tpBtn").disabled =
+        !activeTrade;
 
-    const historyBox = document.getElementById("history");
+    document.getElementById("slBtn").disabled =
+        !activeTrade;
+
+    document.getElementById("openBtn").disabled =
+        !!activeTrade || emergencia;
+
+    const historyBox =
+        document.getElementById("history");
 
     if (history.length === 0) {
-        historyBox.textContent = "Todavía no hay operaciones.";
+        historyBox.textContent =
+            "Todavía no hay operaciones.";
     } else {
-        historyBox.innerHTML = history.map(item =>
-            "<div class='operation'><span>" +
-            item.pair + " · " + item.direction +
-            "<br><small>" + item.result + " · " + item.time +
-            "</small></span><strong class='" +
-            (item.pl >= 0 ? "profit" : "loss") + "'>" +
-            (item.pl >= 0 ? "+" : "") + money(item.pl) +
-            "</strong></div>"
-        ).join("");
+        historyBox.innerHTML = history.map(item => `
+            <div class="operation">
+                <span>
+                    ${item.pair} · ${item.direction}<br>
+                    <small>
+                        ${item.result} · ${item.time}
+                    </small>
+                </span>
+
+                <strong class="${item.pl >= 0 ? "profit" : "loss"}">
+                    ${signedMoney(item.pl)}
+                </strong>
+            </div>
+        `).join("");
     }
 
     updateEngineTest();
     updateRiskTest();
     saveState();
 }
+
+/* =========================================
+   CONTROL DEL ROBOT PRINCIPAL
+========================================= */
 
 function startRobot() {
     if (robotActivo) {
@@ -718,29 +947,46 @@ function startRobot() {
     const started = TradeEngine.start(balance);
 
     if (!started.success) {
-        escribirLog("No se pudo iniciar: " + started.reason);
+        escribirLog(
+            "No se pudo iniciar: " + started.reason
+        );
         return;
     }
 
-    const result = TradeEngine.startAuto(generateTestCandles, 10);
+    const result = TradeEngine.startAuto(
+        generateTestCandles,
+        10
+    );
 
     if (!result.success) {
         TradeEngine.stop();
-        escribirLog("Error al activar el análisis: " + result.reason);
+
+        escribirLog(
+            "Error al activar el análisis: " + result.reason
+        );
+
         updateUI();
         return;
     }
 
     robotActivo = true;
-    escribirLog("Robot activado. Análisis automático cada 10 segundos.");
+
+    escribirLog(
+        "Robot activado. Análisis automático cada 10 segundos."
+    );
+
     updateUI();
 }
 
 function stopRobot() {
     robotActivo = false;
+
     TradeEngine.stop();
 
-    escribirLog("Robot detenido. Las posiciones abiertas se mantienen en la simulación.");
+    escribirLog(
+        "Robot detenido. Las posiciones abiertas se mantienen en la simulación."
+    );
+
     updateUI();
 }
 
@@ -750,23 +996,34 @@ function emergencyStop() {
 
     TradeEngine.stop();
 
-    const openPositions = PositionManager.getOpenPositions();
+    const openPositions =
+        PositionManager.getOpenPositions();
 
     if (openPositions.length > 0) {
         PositionManager.closeAll("EMERGENCY_STOP");
     }
 
-    escribirLog("PARADA DE EMERGENCIA. Motor detenido y posiciones abiertas cerradas.");
+    escribirLog(
+        "PARADA DE EMERGENCIA. Motor detenido y posiciones abiertas cerradas."
+    );
+
     updateUI();
 }
 
+/* =========================================
+   OPERACIONES MANUALES
+========================================= */
+
 function openTrade() {
     if (emergencia) {
-        escribirLog("No se puede abrir una operación: parada de emergencia activa.");
+        escribirLog(
+            "No se puede abrir una operación: parada de emergencia activa."
+        );
         return;
     }
 
-    const amount = Number(document.getElementById("amount").value);
+    const amount =
+        Number(document.getElementById("amount").value);
 
     if (!Number.isFinite(amount) || amount <= 0) {
         alert("Introduce una cantidad válida.");
@@ -774,7 +1031,9 @@ function openTrade() {
     }
 
     if (amount > balance) {
-        alert("No tienes suficiente saldo para esta operación.");
+        alert(
+            "No tienes suficiente saldo para esta operación."
+        );
         return;
     }
 
@@ -784,20 +1043,31 @@ function openTrade() {
         amount
     };
 
-    escribirLog("Operación simulada abierta en " + activeTrade.pair + " por " + money(amount) + ".");
+    escribirLog(
+        "Operación simulada abierta en " +
+        activeTrade.pair +
+        " por " +
+        money(amount) +
+        "."
+    );
+
     updateUI();
 }
 
 function simulateResult(percent) {
     if (!activeTrade) return;
 
-    const pl = activeTrade.amount * (percent / 100);
+    const pl =
+        activeTrade.amount * (percent / 100);
 
     balance += pl;
     totalPL += pl;
     closedCount++;
 
-    const result = percent > 0 ? "Take Profit" : "Stop Loss";
+    const result =
+        percent > 0
+            ? "Take Profit"
+            : "Stop Loss";
 
     history.unshift({
         pair: activeTrade.pair,
@@ -807,116 +1077,137 @@ function simulateResult(percent) {
         time: new Date().toLocaleString()
     });
 
-    escribirLog(result + " alcanzado. Resultado simulado: " +
-        (pl >= 0 ? "+" : "") + money(pl) + ".");
+    escribirLog(
+        result +
+        " alcanzado. Resultado simulado: " +
+        signedMoney(pl) +
+        "."
+    );
 
     activeTrade = null;
+
     updateUI();
 }
 
+/* =========================================
+   REINICIO DE SIMULACIÓN
+========================================= */
+
 function resetSimulation() {
-    if (!confirm("¿Seguro que quieres borrar el historial y reiniciar el capital a $100?")) {
+    if (!confirm(
+        "¿Seguro que quieres borrar el historial y reiniciar el capital a $100?"
+    )) {
         return;
     }
 
     TradeEngine.stop();
+
     robotActivo = false;
     emergencia = false;
+
     balance = 100;
     totalPL = 0;
     closedCount = 0;
+
     activeTrade = null;
     history = [];
 
-    document.getElementById("log").innerHTML = "Simulación reiniciada.<br>";
+    document.getElementById("log").innerHTML =
+        "Simulación reiniciada.<br>";
 
     escribirLog("Capital restaurado a $100.");
+
     updateUI();
 }
 
-function generateTestCandles(pair) {
-    const basePrices = {
-        "EUR/USD": 1.1000,
-        "GBP/USD": 1.2700,
-        "USD/JPY": 150.00
-    };
-
-    let price = basePrices[pair];
-    const candles = [];
-
-    for (let i = 0; i < 100; i++) {
-        const trend = Math.sin(i / 12) * 0.0002;
-        const noise = (Math.random() - 0.5) * 0.001;
-        const open = price;
-        const close = price + trend + noise;
-
-        const high = Math.max(open, close) + Math.random() * 0.0003;
-        const low = Math.min(open, close) - Math.random() * 0.0003;
-
-        candles.push({ open, high, low, close });
-        price = close;
-    }
-
-    return candles;
-}
+/* =========================================
+   ANÁLISIS MANUAL
+========================================= */
 
 function analyzeMarket() {
-    const pair = document.getElementById("analysisPair").value;
+    const pair =
+        document.getElementById("analysisPair").value;
+
     const candles = generateTestCandles(pair);
     const result = TradeAI.analyze(candles);
 
-    const signalElement = document.getElementById("marketSignal");
-    const reasonElement = document.getElementById("signalReason");
+    const signalElement =
+        document.getElementById("marketSignal");
+
+    const reasonElement =
+        document.getElementById("signalReason");
 
     signalElement.textContent = result.signal;
-    reasonElement.textContent = result.reason;
+    reasonElement.textContent =
+        result.reason || "Análisis completado.";
 
     signalElement.style.color =
-        result.signal === "BUY" ? "#50d890" :
-        result.signal === "SELL" ? "#ff6262" : "#ffffff";
+        result.signal === "BUY"
+            ? "#50d890"
+            : result.signal === "SELL"
+                ? "#ff6262"
+                : "#ffffff";
 
-    if (result.indicators) {
-        document.getElementById("ema20Value").textContent =
-            result.indicators.emaFast.toFixed(5);
-        document.getElementById("ema50Value").textContent =
-            result.indicators.emaSlow.toFixed(5);
-        document.getElementById("rsiValue").textContent =
-            result.indicators.rsi.toFixed(2);
-        document.getElementById("atrValue").textContent =
-            result.indicators.atr.toFixed(5);
-    }
+    document.getElementById("marketPrice").textContent =
+        "Precio simulado: " +
+        Number(result.price || 0).toFixed(5);
 
-    escribirLog("Análisis simulado de " + pair + ": " + result.signal + ". " + result.reason);
+    escribirLog(
+        "Análisis simulado de " +
+        pair +
+        ": " +
+        result.signal +
+        ". " +
+        (result.reason || "")
+    );
 }
+
+/* =========================================
+   PRUEBA DEL GESTOR DE RIESGO
+========================================= */
 
 TradeRisk.startCycle(100);
 
 function updateRiskTest() {
     const status = TradeRisk.getStatus();
 
-    document.getElementById("riskStatus").textContent = status.cycleStatus;
-    document.getElementById("riskStart").textContent = money(status.startingBalance);
-    document.getElementById("riskBalance").textContent = money(status.currentBalance);
+    document.getElementById("riskStatus").textContent =
+        status.cycleStatus;
 
-    const plElement = document.getElementById("riskPL");
+    document.getElementById("riskStart").textContent =
+        money(status.startingBalance);
+
+    document.getElementById("riskBalance").textContent =
+        money(status.currentBalance);
+
+    const plElement =
+        document.getElementById("riskPL");
+
     plElement.textContent =
-        (status.cycleProfitLoss >= 0 ? "+" : "") + money(status.cycleProfitLoss);
+        signedMoney(status.cycleProfitLoss);
 
     plElement.className =
-        "metric-value " + (status.cycleProfitLoss >= 0 ? "profit" : "loss");
+        "metric-value " +
+        (status.cycleProfitLoss >= 0
+            ? "profit"
+            : "loss");
 
-    document.getElementById("riskAction").textContent = status.action;
+    document.getElementById("riskAction").textContent =
+        status.action;
 }
 
 function recordRiskTest(amount) {
     TradeRisk.recordTrade(amount);
+
     updateRiskTest();
 
     const status = TradeRisk.getStatus();
 
     document.getElementById("riskMessage").textContent =
-        "Resultado registrado. Estado: " + status.cycleStatus +
-        ". Acción: " + status.action;
+        "Resultado registrado. Estado: " +
+        status.cycleStatus +
+        ". Acción: " +
+        status.action;
 }
 
 function testRiskProfit() {
@@ -930,18 +1221,29 @@ function testRiskLoss() {
 function resetRiskTest() {
     const status = TradeRisk.getStatus();
 
-    if (status.cycleStatus === "ACTIVE" && status.cycleProfitLoss === 0) {
-        document.getElementById("riskMessage").textContent = "El ciclo ya está reiniciado.";
+    if (
+        status.cycleStatus === "ACTIVE" &&
+        status.cycleProfitLoss === 0
+    ) {
+        document.getElementById("riskMessage").textContent =
+            "El ciclo ya está reiniciado.";
         return;
     }
 
-    const result = TradeRisk.resetCycle(status.currentBalance);
+    const result =
+        TradeRisk.resetCycle(status.currentBalance);
 
     updateRiskTest();
 
     document.getElementById("riskMessage").textContent =
-        "Nuevo ciclo iniciado con " + money(result.startingBalance) + ".";
+        "Nuevo ciclo iniciado con " +
+        money(result.startingBalance) +
+        ".";
 }
+
+/* =========================================
+   MOTOR AUTÓNOMO DE PRUEBA
+========================================= */
 
 function startEngineTest() {
     const result = TradeEngine.start(balance);
@@ -952,7 +1254,10 @@ function startEngineTest() {
     }
 
     updateEngineTest();
-    escribirLog("Motor autónomo de prueba iniciado.");
+
+    escribirLog(
+        "Motor autónomo de prueba iniciado."
+    );
 }
 
 function stopEngineTest() {
@@ -961,27 +1266,40 @@ function stopEngineTest() {
 }
 
 function analyzeEngineTest() {
-    const pairs = ["EUR/USD", "GBP/USD", "USD/JPY"];
+    const pairs = [
+        "EUR/USD",
+        "GBP/USD",
+        "USD/JPY"
+    ];
 
     pairs.forEach(pair => {
-        TradeEngine.analyzePair(pair, generateTestCandles(pair));
+        TradeEngine.analyzePair(
+            pair,
+            generateTestCandles(pair)
+        );
     });
 
     updateEngineTest();
 }
 
 function simulateEngineProfit() {
-    const result = TradeEngine.recordResult(1);
+    const result =
+        TradeEngine.recordResult(1);
 
-    if (!result.success) alert(result.reason);
+    if (!result.success) {
+        alert(result.reason);
+    }
 
     updateEngineTest();
 }
 
 function simulateEngineLoss() {
-    const result = TradeEngine.recordResult(-0.50);
+    const result =
+        TradeEngine.recordResult(-0.50);
 
-    if (!result.success) alert(result.reason);
+    if (!result.success) {
+        alert(result.reason);
+    }
 
     updateEngineTest();
 }
@@ -990,11 +1308,14 @@ function restartEngineTest() {
     const status = TradeEngine.getStatus();
 
     if (status.engineStatus !== "WAITING") {
-        alert("El motor debe estar esperando para reiniciar el ciclo.");
+        alert(
+            "El motor debe estar esperando para reiniciar el ciclo."
+        );
         return;
     }
 
-    const result = TradeEngine.restartCycle();
+    const result =
+        TradeEngine.restartCycle();
 
     if (!result.success) {
         alert(result.reason);
@@ -1002,6 +1323,10 @@ function restartEngineTest() {
 
     updateEngineTest();
 }
+
+/* =========================================
+   ACTUALIZACIÓN DEL PANEL AUTÓNOMO
+========================================= */
 
 function updateEngineTest() {
     const status = TradeEngine.getStatus();
@@ -1011,49 +1336,62 @@ function updateEngineTest() {
         status.engineStatus;
 
     document.getElementById("engineBalance").textContent =
-        money(risk ? risk.currentBalance : 0);
+        money(
+            risk
+                ? risk.currentBalance
+                : 0
+        );
 
-   
-const stats = status.allTimeStats || {
-    totalWins: 0,
-    totalLosses: 0,
-    netProfitLoss: 0
-};
+    const stats = status.allTimeStats || {
+        totalWins: 0,
+        totalLosses: 0,
+        netProfitLoss: 0
+    };
 
-const plElement = document.getElementById("enginePL");
+    const plElement =
+        document.getElementById("enginePL");
 
-plElement.textContent =
-    (stats.netProfitLoss >= 0 ? "+" : "") +
-    money(stats.netProfitLoss);
+    plElement.textContent =
+        signedMoney(stats.netProfitLoss);
 
-plElement.className =
-    "metric-value " +
-    (stats.netProfitLoss >= 0 ? "profit" : "loss");
+    plElement.className =
+        "metric-value " +
+        (stats.netProfitLoss >= 0
+            ? "profit"
+            : "loss");
 
-document.getElementById("engineWins").textContent =
-    "+" + money(stats.totalWins);
+    const signalsBox =
+        document.getElementById("engineSignals");
 
-document.getElementById("engineLosses").textContent =
-    "-" + money(stats.totalLosses);
-
-
-    const signalsBox = document.getElementById("engineSignals");
-    const signals = Object.entries(status.lastSignals || {});
+    const signals =
+        Object.entries(status.lastSignals || {});
 
     signalsBox.innerHTML = signals.length
-        ? signals.map(([pair, data]) =>
-            "<div class='operation'><span>" + pair +
-            "</span><strong>" + data.signal + "</strong></div>"
-        ).join("")
+        ? signals.map(([pair, data]) => `
+            <div class="operation">
+                <span>${pair}</span>
+                <strong>${data.signal}</strong>
+            </div>
+        `).join("")
         : "Todavía no hay señales.";
 
-    const positionsBox = document.getElementById("enginePositions");
-    const positions = status.openPositions || [];
+    const positionsBox =
+        document.getElementById("enginePositions");
+
+    const positions =
+        status.openPositions || [];
 
     positionsBox.innerHTML = positions.length
         ? positions.map(position => {
-            const pl = Number(position.profitLoss || 0);
-            const margin = Number(position.margin || 0);
+            const pl =
+                Number(position.profitLoss || 0);
+
+            const margin =
+                Number(
+                    position.margin ||
+                    position.amount ||
+                    0
+                );
 
             return `
                 <div class="operation">
@@ -1061,62 +1399,92 @@ document.getElementById("engineLosses").textContent =
                         <strong>${position.pair}</strong><br>
                         Dirección: ${position.direction}<br>
                         Margen: ${money(margin)}<br>
-                        Entrada: ${position.entryPrice}<br>
-                        Precio actual: ${position.currentPrice}
+                        Entrada: ${Number(position.entryPrice || 0).toFixed(5)}<br>
+                        Precio actual: ${Number(position.currentPrice || 0).toFixed(5)}
                     </span>
+
                     <strong class="${pl >= 0 ? "profit" : "loss"}">
-                        ${pl >= 0 ? "+" : ""}${money(pl)}
+                        ${signedMoney(pl)}
                     </strong>
                 </div>
             `;
         }).join("")
         : "No hay posiciones abiertas.";
 
-    const historyBox = document.getElementById("enginePositionHistory");
-    const positionHistory = status.allHistory || [];
+    const historyBox =
+        document.getElementById("enginePositionHistory");
+
+    const positionHistory =
+        status.allHistory || [];
 
     historyBox.innerHTML = positionHistory.length
         ? positionHistory.map(position => {
-            const pl = Number(position.profitLoss || 0);
+            const pl =
+                Number(position.profitLoss || 0);
 
             return `
                 <div class="operation">
                     <span>
                         <strong>${position.pair}</strong><br>
-                       ${position.direction}<br>
-${position.closeReason || position.status || "Cerrada"}<br>
-<small>
-    ${position.closedAt
-        ? new Date(position.closedAt).toLocaleString()
-        : "Fecha no disponible"}
-</small>
+                        ${position.direction}<br>
+                        ${position.closeReason || position.status || "Cerrada"}<br>
+
+                        <small>
+                            ${position.closedAt
+                                ? new Date(position.closedAt).toLocaleString()
+                                : "Fecha no disponible"}
+                        </small>
                     </span>
+
                     <strong class="${pl >= 0 ? "profit" : "loss"}">
-                        ${pl >= 0 ? "+" : ""}${money(pl)}
+                        ${signedMoney(pl)}
                     </strong>
                 </div>
             `;
         }).join("")
         : "Todavía no hay posiciones cerradas.";
 
-    const logBox = document.getElementById("engineLog");
-    const decisions = status.decisionLog || [];
+    const logBox =
+        document.getElementById("engineLog");
+
+    const decisions =
+        status.decisionLog || [];
 
     logBox.innerHTML = decisions.length
-        ? decisions.map(item =>
-            "<div>[" + new Date(item.timestamp).toLocaleTimeString() +
-            "] " + item.message + "</div>"
-        ).join("")
+        ? decisions.map(item => `
+            <div>
+                [${new Date(item.timestamp).toLocaleTimeString()}]
+                ${item.message}
+            </div>
+        `).join("")
         : "Sin decisiones registradas.";
+
+    // Mostrar estadísticas acumuladas en el panel de análisis.
+    document.getElementById("analysisBalance").textContent =
+        money(risk ? risk.currentBalance : 0);
+
+    document.getElementById("analysisPL").textContent =
+        signedMoney(stats.netProfitLoss);
+
+    document.getElementById("analysisWins").textContent =
+        "+" + money(stats.totalWins);
+
+    document.getElementById("analysisLosses").textContent =
+        "-" + money(stats.totalLosses);
 }
+
+/* =========================================
+   INICIALIZACIÓN
+========================================= */
 
 loadState();
 updateUI();
 
-// Actualizar el panel del motor cada segundo
+// Actualizar la interfaz cada segundo.
 setInterval(() => {
-    updateEngineTest();
+    updateUI();
 }, 1000);
+
 </script>
 
 </body>
