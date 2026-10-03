@@ -466,6 +466,18 @@ input, select {
         Esperando análisis.
     </div>
 
+<h3>Posiciones abiertas</h3>
+
+<div id="enginePositions" class="log">
+    No hay posiciones abiertas.
+</div>
+
+<h3>Historial de posiciones cerradas</h3>
+
+<div id="enginePositionHistory" class="log">
+    Todavía no hay posiciones cerradas.
+</div>
+
     <h3>Registro de decisiones</h3>
 
     <div id="engineLog" class="log">
@@ -1157,6 +1169,86 @@ function updateEngineTest() {
         ).join("")
         : "Todavía no hay señales.";
 
+
+    // Mostrar posiciones abiertas
+    const positionsBox =
+        document.getElementById("enginePositions");
+
+    const positions = status.positions || [];
+
+    positionsBox.innerHTML = positions.length
+        ? positions.map(position => {
+
+            const pl = Number(
+                position.profitLoss ??
+                position.unrealizedPL ??
+                position.pnl ??
+                0
+            );
+
+            const margin = Number(
+                position.margin ??
+                position.amount ??
+                position.invested ??
+                0
+            );
+
+            const entry = Number(
+                position.entryPrice ?? 0
+            );
+
+            const current = Number(
+                position.currentPrice ?? 0
+            );
+
+            return `
+                <div class="operation">
+                    <span>
+                        <strong>${position.pair}</strong><br>
+                        Dirección: ${position.direction}<br>
+                        Margen: ${money(margin)}<br>
+                        Entrada: ${entry || "--"}<br>
+                        Precio actual: ${current || "--"}
+                    </span>
+                    <strong class="${pl >= 0 ? "profit" : "loss"}">
+                        ${pl >= 0 ? "+" : ""}${money(pl)}
+                    </strong>
+                </div>
+            `;
+        }).join("")
+        : "No hay posiciones abiertas.";
+
+
+    // Mostrar historial de posiciones cerradas
+    const positionHistoryBox =
+        document.getElementById("enginePositionHistory");
+
+    const positionHistory = status.history || [];
+
+    positionHistoryBox.innerHTML = positionHistory.length
+        ? positionHistory.map(position => {
+
+            const pl = Number(
+                position.profitLoss ??
+                position.unrealizedPL ??
+                position.pnl ??
+                0
+            );
+
+            return `
+                <div class="operation">
+                    <span>
+                        <strong>${position.pair}</strong><br>
+                        ${position.direction || ""}<br>
+                        ${position.reason || position.status || "Cerrada"}
+                    </span>
+                    <strong class="${pl >= 0 ? "profit" : "loss"}">
+                        ${pl >= 0 ? "+" : ""}${money(pl)}
+                    </strong>
+                </div>
+            `;
+        }).join("")
+        : "Todavía no hay posiciones cerradas.";
 
     // Mostrar decisiones
     const logBox =
