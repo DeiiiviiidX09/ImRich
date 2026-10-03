@@ -66,8 +66,6 @@ const TradeEngine = (() => {
     // Detener motor
     function stop() {
 
-        stopAuto();
-
         engineStatus = "STOPPED";
 
         logDecision("Motor detenido.");
