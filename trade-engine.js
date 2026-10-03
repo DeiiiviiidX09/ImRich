@@ -7,6 +7,9 @@ const TradeEngine = (() => {
     let intervalSeconds = 10;
     let cyclePositionIds = new Set();
     let manualPL = 0;
+    let lifetimeManualWins = 0;
+
+let lifetimeManualLosses = 0;
     let lastSignals = {};
     let decisionLog = [];
     let lastError = null;
@@ -57,7 +60,35 @@ const TradeEngine = (() => {
 
         return openPL + closedPL + manualPL;
     }
+function calculateAllTimeStats() {
+    const closed = PositionManager.getHistory();
+    const open = PositionManager.getOpenPositions();
 
+    const allPositions = [...closed, ...open];
+
+    const positionWins = allPositions.reduce(
+        (total, position) =>
+            total + Math.max(0, Number(position.profitLoss || 0)),
+        0
+    );
+
+    const positionLosses = allPositions.reduce(
+        (total, position) =>
+            total + Math.abs(Math.min(0, Number(position.profitLoss || 0))),
+        0
+    );
+
+    const totalWins = positionWins + lifetimeManualWins;
+    const totalLosses = positionLosses + lifetimeManualLosses;
+
+    return {
+        totalWins,
+        totalLosses,
+        netProfitLoss: totalWins - totalLosses,
+        closedTrades: closed.length,
+        openTrades: open.length
+    };
+}
     function getRiskStatus() {
         return risk ? risk.getStatus() : null;
     }
@@ -454,7 +485,11 @@ const TradeEngine = (() => {
         }
 
         manualPL += value;
-
+if (value >= 0) {
+    lifetimeManualWins += value;
+} else {
+    lifetimeManualLosses += Math.abs(value);
+}
         log(
             `Resultado simulado registrado: ${value.toFixed(2)}.`,
             "info"
@@ -483,7 +518,7 @@ const TradeEngine = (() => {
         const openPositions = getCurrentCyclePositions();
         const positionHistory = getCurrentCycleHistory();
         const riskStatus = getRiskStatus();
-
+const allTimeStats = calculateAllTimeStats();
         return {
             engineStatus,
             isRunning: engineStatus === "RUNNING",
@@ -502,7 +537,7 @@ const TradeEngine = (() => {
             positionHistory,
             history: positionHistory,
             allHistory: PositionManager.getHistory(),
-
+allTimeStats,
             lastSignals,
             decisionLog,
             decisions: decisionLog,
