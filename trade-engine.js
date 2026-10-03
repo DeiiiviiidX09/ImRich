@@ -1,8 +1,8 @@
 
 /*
  * TRADE AI
- * Motor central v1.1
- * Análisis automático y gestión de ciclos.
+ * Motor central v2.0
+ * Análisis y operaciones automáticas.
  * Solo simulación.
  */
 
@@ -14,12 +14,20 @@ const TradeEngine = (() => {
     let lastSignals = {};
     let decisions = [];
     let autoTimer = null;
-    let pairs = ["EUR/USD", "GBP/USD", "USD/JPY"];
+
+    const pairs = [
+        "EUR/USD",
+        "GBP/USD",
+        "USD/JPY"
+    ];
+
+    const MAX_POSITIONS = 3;
 
     // Iniciar el motor
     function start(capital) {
 
         stopAuto();
+        PositionManager.reset();
 
         risk.startCycle(capital);
 
@@ -39,7 +47,6 @@ const TradeEngine = (() => {
     function stop() {
 
         stopAuto();
-
         engineStatus = "STOPPED";
 
         logDecision("Motor detenido.");
@@ -47,7 +54,86 @@ const TradeEngine = (() => {
         return getStatus();
     }
 
-    // Analizar un par
+    // Registrar una decisión
+    function logDecision(message) {
+
+        decisions.unshift({
+            message,
+            time: new Date().toLocaleTimeString()
+        });
+
+        if (decisions.length > 100) {
+            decisions.pop();
+        }
+    }
+
+    // Procesar resultados de posiciones cerradas
+    function processClosedPositions(closedPositions) {
+
+        for (const position of closedPositions) {
+
+            const result = risk.recordTrade(
+                position.profitLoss
+            );
+
+            logDecision(
+                position.pair + " cerrada. Resultado: " +
+                (position.profitLoss >= 0 ? "+" : "") +
+                "$" + position.profitLoss.toFixed(2)
+            );
+
+            if (result.cycleStatus === "TAKE_PROFIT") {
+
+                engineStatus = "WAITING";
+                stopAuto();
+
+                logDecision(
+                    "Objetivo del ciclo alcanzado."
+                );
+
+                const remaining =
+                    PositionManager.closeAll("CYCLE_TAKE_PROFIT");
+
+                settleRemainingPositions(remaining);
+
+                break;
+
+            } else if (result.cycleStatus === "LOSS_LIMIT") {
+
+                engineStatus = "RESTART_REQUIRED";
+                stopAuto();
+
+                logDecision(
+                    "Límite de pérdidas del ciclo alcanzado."
+                );
+
+                const remaining =
+                    PositionManager.closeAll("CYCLE_LOSS_LIMIT");
+
+                settleRemainingPositions(remaining);
+
+                break;
+            }
+        }
+    }
+
+    // Registrar el resultado de las posiciones restantes
+    function settleRemainingPositions(positions) {
+
+        for (const position of positions) {
+
+            risk.recordTrade(position.profitLoss);
+
+            logDecision(
+                position.pair +
+                " cerrada por límite global. Resultado: " +
+                (position.profitLoss >= 0 ? "+" : "") +
+                "$" + position.profitLoss.toFixed(2)
+            );
+        }
+    }
+
+    // Analizar un par y gestionar su posición
     function analyzePair(pair, candles) {
 
         if (engineStatus !== "RUNNING") {
@@ -72,154 +158,192 @@ const TradeEngine = (() => {
             result.reason
         );
 
+        if (!result.price || !Number.isFinite(result.price)) {
+            return result;
+        }
+
+        // Actualizar posiciones abiertas con el precio más reciente
+        const closed = PositionManager.updatePrice(
+            pair,
+            result.price
+        );
+
+        if (closed.length > 0) {
+            processClosedPositions(closed);
+        }
+
+        // No abrir nuevas posiciones si el ciclo terminó
+        if (engineStatus !== "RUNNING") {
+            return result;
+        }
+
+        // Solo abrir si hay señal válida
+        if (
+            result.signal !== "BUY" &&
+            result.signal !== "SELL"
+        ) {
+            return result;
+        }
+
+        const openPositions =
+            PositionManager.getOpenPositions();
+
+        // Evitar varias posiciones simultáneas en el mismo par
+        const alreadyOpen = openPositions.some(
+            position => position.pair === pair
+        );
+
+        if (alreadyOpen) {
+            return result;
+        }
+
+        if (openPositions.length >= MAX_POSITIONS) {
+            return result;
+        }
+
+        const status = risk.getStatus();
+
+        const available =
+            status.currentBalance -
+            PositionManager.getTotalMargin();
+
+        const allocation =
+            status.currentBalance / MAX_POSITIONS;
+
+        const amount = Math.min(
+            allocation,
+            available
+        );
+
+        if (amount <= 0) {
+            logDecision(
+                "Capital disponible insuficiente para abrir " +
+                pair
+            );
+            return result;
+        }
+
+        const opened = PositionManager.openPosition(
+            pair,
+            result.signal,
+            amount,
+            result.price
+        );
+
+        if (opened.success) {
+
+            logDecision(
+                "Posición " + result.signal +
+                " abierta en " + pair +
+                " con margen de $" +
+                amount.toFixed(2)
+            );
+
+        } else {
+
+            logDecision(
+                "No se pudo abrir " + pair +
+                ": " + opened.reason
+            );
+        }
+
         return result;
     }
 
     // Activar análisis automático
-
-function startAuto(candleProvider, intervalSeconds = 30) {
-
-    if (engineStatus !== "RUNNING") {
-        return {
-            success: false,
-            reason: "Primero debes iniciar el motor."
-        };
-    }
-
-    if (typeof candleProvider !== "function") {
-        return {
-            success: false,
-            reason: "No se encontró el proveedor de datos."
-        };
-    }
-
-    stopAuto();
-
-    logDecision(
-        "Análisis automático activado. Intervalo: " +
-        intervalSeconds + " segundos."
-    );
-
-    async function runAnalysis() {
+    function startAuto(
+        candleProvider,
+        intervalSeconds = 30
+    ) {
 
         if (engineStatus !== "RUNNING") {
-            stopAuto();
-            return;
+            return {
+                success: false,
+                reason: "Primero debes iniciar el motor."
+            };
         }
 
-        logDecision("Iniciando nuevo ciclo de análisis.");
+        if (typeof candleProvider !== "function") {
+            return {
+                success: false,
+                reason: "No se encontró el proveedor de datos."
+            };
+        }
 
-        for (const pair of pairs) {
+        stopAuto();
+
+        logDecision(
+            "Análisis automático activado. Intervalo: " +
+            intervalSeconds + " segundos."
+        );
+
+        async function runAnalysis() {
 
             if (engineStatus !== "RUNNING") {
-                break;
+                stopAuto();
+                return;
             }
 
-            try {
+            for (const pair of pairs) {
 
-                const candles = await candleProvider(pair);
+                if (engineStatus !== "RUNNING") {
+                    break;
+                }
 
-                if (!Array.isArray(candles) || candles.length === 0) {
+                try {
+
+                    const candles =
+                        await candleProvider(pair);
+
+                    if (
+                        !Array.isArray(candles) ||
+                        candles.length === 0
+                    ) {
+                        logDecision(
+                            pair + ": no hay datos disponibles."
+                        );
+                        continue;
+                    }
+
+                    analyzePair(pair, candles);
+
+                } catch (error) {
 
                     logDecision(
-                        pair + ": no hay datos disponibles."
-                    );
-
-                    continue;
-                }
-
-                const result = analyzePair(pair, candles);
-
-                logDecision(
-                    "Análisis completado para " + pair +
-                    ". Señal: " + result.signal
-                );
-
-                if (typeof updateEngineTest === "function") {
-                    updateEngineTest();
-                }
-
-            } catch (error) {
-
-                logDecision(
-                    "ERROR en " + pair + ": " +
-                    error.message
-                );
-
-                if (typeof escribirLog === "function") {
-                    escribirLog(
-                        "Error de análisis en " + pair +
+                        "Error analizando " + pair +
                         ": " + error.message
                     );
                 }
+            }
 
-                if (typeof updateEngineTest === "function") {
-                    updateEngineTest();
-                }
+            if (typeof updateEngineTest === "function") {
+                updateEngineTest();
             }
         }
 
-        logDecision("Ciclo de análisis finalizado.");
+        runAnalysis();
 
-        if (typeof updateEngineTest === "function") {
-            updateEngineTest();
-        }
-    }
-
-    // Ejecutar el primer análisis inmediatamente
-    runAnalysis();
-
-    // Repetir el análisis automáticamente
-    autoTimer = setInterval(
-        runAnalysis,
-        intervalSeconds * 1000
-    );
-
-    return {
-        success: true,
-        message: "Análisis automático activado."
-    };
-}
-
-
-    // Registrar resultado de una operación simulada
-    function recordResult(profitLoss) {
-
-        if (engineStatus !== "RUNNING") {
-            return getStatus();
-        }
-
-        const result = risk.recordTrade(profitLoss);
-
-        logDecision(
-            "Resultado registrado: " +
-            (profitLoss >= 0 ? "+" : "") +
-            "$" + profitLoss.toFixed(2)
+        autoTimer = setInterval(
+            runAnalysis,
+            intervalSeconds * 1000
         );
 
-        if (result.cycleStatus === "TAKE_PROFIT") {
-
-            stopAuto();
-            engineStatus = "WAITING";
-
-            logDecision(
-                "Objetivo alcanzado. Análisis detenido."
-            );
-
-        } else if (result.cycleStatus === "LOSS_LIMIT") {
-
-            stopAuto();
-            engineStatus = "RESTART_REQUIRED";
-
-            logDecision(
-                "Límite de pérdidas alcanzado. Análisis detenido."
-            );
-        }
-
-        return getStatus();
+        return {
+            success: true,
+            message: "Análisis automático activado."
+        };
     }
 
-    // Reiniciar ciclo con capital restante
+    // Detener análisis automático
+    function stopAuto() {
+
+        if (autoTimer !== null) {
+            clearInterval(autoTimer);
+            autoTimer = null;
+        }
+    }
+
+    // Reiniciar el ciclo con el capital restante
     function restartCycle() {
 
         const status = risk.getStatus();
@@ -235,10 +359,14 @@ function startAuto(candleProvider, intervalSeconds = 30) {
 
             engineStatus = "STOPPED";
 
-            logDecision("Capital insuficiente. Motor detenido.");
+            logDecision(
+                "Capital insuficiente. Motor detenido."
+            );
 
             return getStatus();
         }
+
+        PositionManager.reset();
 
         risk.resetCycle(status.currentBalance);
 
@@ -253,20 +381,7 @@ function startAuto(candleProvider, intervalSeconds = 30) {
         return getStatus();
     }
 
-    // Registrar decisiones
-    function logDecision(message) {
-
-        decisions.unshift({
-            message,
-            time: new Date().toLocaleTimeString()
-        });
-
-        if (decisions.length > 100) {
-            decisions.pop();
-        }
-    }
-
-    // Consultar estado
+    // Consultar estado completo
     function getStatus() {
 
         return {
@@ -274,7 +389,10 @@ function startAuto(candleProvider, intervalSeconds = 30) {
             risk: risk.getStatus(),
             lastSignals,
             decisions,
-            autoRunning: autoTimer !== null
+            autoRunning: autoTimer !== null,
+            positions: PositionManager.getOpenPositions(),
+            history: PositionManager.getHistory(),
+            totalMargin: PositionManager.getTotalMargin()
         };
     }
 
@@ -284,7 +402,6 @@ function startAuto(candleProvider, intervalSeconds = 30) {
         analyzePair,
         startAuto,
         stopAuto,
-        recordResult,
         restartCycle,
         getStatus
     };
