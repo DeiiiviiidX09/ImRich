@@ -1,9 +1,16 @@
 
 /*
  * TRADE AI
- * Gestor de posiciones v1.2
+ * Gestor de posiciones v2.0
  * Simulación exclusivamente.
- * Conserva el historial entre ciclos.
+ *
+ * Características:
+ * - Apalancamiento configurable.
+ * - Take Profit y Stop Loss sobre el margen.
+ * - Cálculo de P/L realizado y flotante.
+ * - Conservación del historial entre ciclos.
+ * - Validación de precios y cantidades.
+ * - Protección contra cierres con resultados inválidos.
  */
 
 const PositionManager = (() => {
@@ -14,18 +21,18 @@ const PositionManager = (() => {
     const CONFIG = {
         maxPositions: 20,
         leverage: 30,
+
+        // Porcentaje del margen, no del movimiento del precio.
         takeProfitPercent: 0.20,
         stopLossPercent: 5
     };
 
-    // Contar solamente posiciones abiertas
     function countOpenPositions() {
         return positions.filter(
             position => position.status === "OPEN"
         ).length;
     }
 
-    // Abrir una posición simulada
     function openPosition(pair, direction, amount, price) {
 
         if (countOpenPositions() >= CONFIG.maxPositions) {
@@ -53,11 +60,19 @@ const PositionManager = (() => {
             id: nextId++,
             pair,
             direction,
+
             margin: amount,
             leverage: CONFIG.leverage,
+
+            // Exposición total de la operación.
+            exposure: amount * CONFIG.leverage,
+
             entryPrice: price,
             currentPrice: price,
+
             profitLoss: 0,
+            profitLossPercent: 0,
+
             status: "OPEN",
             openedAt: new Date().toISOString(),
             closedAt: null,
@@ -73,8 +88,23 @@ const PositionManager = (() => {
         };
     }
 
-    // Calcular resultado de una posición
+    /*
+     * Calcula el resultado de una posición.
+     *
+     * P/L = margen × variación del precio × apalancamiento
+     */
+
     function calculateProfitLoss(position, price) {
+
+        if (
+            !position ||
+            !Number.isFinite(price) ||
+            price <= 0 ||
+            !Number.isFinite(position.entryPrice) ||
+            position.entryPrice <= 0
+        ) {
+            return 0;
+        }
 
         let movement;
 
@@ -95,22 +125,44 @@ const PositionManager = (() => {
         );
     }
 
-    // Cerrar una posición
+    function updatePositionResult(position, price) {
+
+        position.currentPrice = price;
+
+        position.profitLoss =
+            calculateProfitLoss(position, price);
+
+        position.profitLossPercent =
+            position.margin > 0
+                ? (position.profitLoss / position.margin) * 100
+                : 0;
+    }
+
     function closePosition(position, reason) {
 
         if (position.status !== "OPEN") {
-            return;
+            return false;
         }
 
         position.status = "CLOSED";
         position.closeReason = reason;
         position.closedAt = new Date().toISOString();
+
+        return true;
     }
 
-    // Actualizar precio y comprobar salidas individuales
+    /*
+     * Actualiza el precio de todas las posiciones abiertas
+     * del par y comprueba sus límites individuales.
+     */
+
     function updatePrice(pair, price) {
 
-        if (!Number.isFinite(price) || price <= 0) {
+        if (
+            !pair ||
+            !Number.isFinite(price) ||
+            price <= 0
+        ) {
             return [];
         }
 
@@ -125,25 +177,29 @@ const PositionManager = (() => {
                 return;
             }
 
-            position.currentPrice = price;
-
-            position.profitLoss =
-                calculateProfitLoss(position, price);
+            updatePositionResult(position, price);
 
             const profitTarget =
                 position.margin *
-                CONFIG.takeProfitPercent / 100;
+                (CONFIG.takeProfitPercent / 100);
 
             const lossLimit =
                 position.margin *
-                CONFIG.stopLossPercent / 100;
+                (CONFIG.stopLossPercent / 100);
 
-            if (position.profitLoss >= profitTarget) {
+            // No cerrar por cero ni por valores insignificantes.
+            if (
+                position.profitLoss >= profitTarget &&
+                position.profitLoss > 0
+            ) {
 
                 closePosition(position, "TAKE_PROFIT");
                 closed.push({ ...position });
 
-            } else if (position.profitLoss <= -lossLimit) {
+            } else if (
+                position.profitLoss <= -lossLimit &&
+                position.profitLoss < 0
+            ) {
 
                 closePosition(position, "STOP_LOSS");
                 closed.push({ ...position });
@@ -153,16 +209,22 @@ const PositionManager = (() => {
         return closed;
     }
 
-    // Cerrar todas las posiciones abiertas
+    /*
+     * Cierra todas las posiciones abiertas.
+     * Conserva el último P/L calculado para cada una.
+     */
+
     function closeAll(reason = "CYCLE_LIMIT") {
 
         const closed = [];
 
         positions.forEach(position => {
 
-            if (position.status === "OPEN") {
+            if (position.status !== "OPEN") {
+                return;
+            }
 
-                closePosition(position, reason);
+            if (closePosition(position, reason)) {
                 closed.push({ ...position });
             }
         });
@@ -170,7 +232,6 @@ const PositionManager = (() => {
         return closed;
     }
 
-    // Obtener posiciones abiertas
     function getOpenPositions() {
 
         return positions
@@ -178,7 +239,6 @@ const PositionManager = (() => {
             .map(position => ({ ...position }));
     }
 
-    // Obtener historial completo de posiciones cerradas
     function getHistory() {
 
         return positions
@@ -187,17 +247,24 @@ const PositionManager = (() => {
             .reverse();
     }
 
-    // Calcular resultado no realizado total
     function getUnrealizedProfitLoss() {
 
         return getOpenPositions().reduce(
             (total, position) =>
-                total + position.profitLoss,
+                total + Number(position.profitLoss || 0),
             0
         );
     }
 
-    // Calcular margen total comprometido
+    function getRealizedProfitLoss() {
+
+        return getHistory().reduce(
+            (total, position) =>
+                total + Number(position.profitLoss || 0),
+            0
+        );
+    }
+
     function getTotalMargin() {
 
         return getOpenPositions().reduce(
@@ -207,7 +274,20 @@ const PositionManager = (() => {
         );
     }
 
-    // Reiniciar posiciones abiertas sin borrar el historial
+    function getTotalExposure() {
+
+        return getOpenPositions().reduce(
+            (total, position) =>
+                total + position.exposure,
+            0
+        );
+    }
+
+    /*
+     * Reinicia las posiciones abiertas sin borrar el historial.
+     * clearHistory=true elimina todo el historial.
+     */
+
     function reset(clearHistory = false) {
 
         positions = positions.filter(
@@ -224,10 +304,16 @@ const PositionManager = (() => {
         openPosition,
         updatePrice,
         closeAll,
+
         getOpenPositions,
         getHistory,
+
         getTotalMargin,
+        getTotalExposure,
+
         getUnrealizedProfitLoss,
+        getRealizedProfitLoss,
+
         countOpenPositions,
         reset
     };
