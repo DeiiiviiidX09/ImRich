@@ -1174,16 +1174,21 @@ function analyzeMarket() {
         ". " +
         (result.reason || "")
     );
-}
 
 /* =========================================
    PRUEBA DEL GESTOR DE RIESGO
 ========================================= */
 
-TradeRisk.startCycle(100);
+// Instancia independiente para el panel de diagnóstico.
+// No modifica el gestor utilizado por TradeEngine.
+
+const riskTestManager = TradeRisk.createManager();
+
+riskTestManager.startCycle(100);
 
 function updateRiskTest() {
-    const status = TradeRisk.getStatus();
+
+    const status = riskTestManager.getStatus();
 
     if (!status) return;
 
@@ -1208,22 +1213,50 @@ function updateRiskTest() {
             ? "profit"
             : "loss");
 
+    let action = "CONTINUE";
+
+    if (status.cycleStatus === "TAKE_PROFIT") {
+        action = "TAKE PROFIT";
+    } else if (status.cycleStatus === "LOSS_LIMIT") {
+        action = "STOP";
+    }
+
     document.getElementById("riskAction").textContent =
-        status.action;
+        action;
 }
 
 function recordRiskTest(amount) {
-    TradeRisk.recordTrade(amount);
+
+    const status = riskTestManager.getStatus();
+
+    if (status.cycleStatus !== "ACTIVE") {
+        document.getElementById("riskMessage").textContent =
+            "El ciclo terminó. Reinicia la prueba para continuar.";
+
+        return;
+    }
+
+    const newResult =
+        status.cycleProfitLoss + Number(amount);
+
+    const result =
+        riskTestManager.updateCycleProfitLoss(newResult);
 
     updateRiskTest();
 
-    const status = TradeRisk.getStatus();
+    let action = "CONTINUE";
+
+    if (result.cycleStatus === "TAKE_PROFIT") {
+        action = "TAKE PROFIT";
+    } else if (result.cycleStatus === "LOSS_LIMIT") {
+        action = "STOP";
+    }
 
     document.getElementById("riskMessage").textContent =
         "Resultado registrado. Estado: " +
-        status.cycleStatus +
+        result.cycleStatus +
         ". Acción: " +
-        status.action;
+        action;
 }
 
 function testRiskProfit() {
@@ -1235,7 +1268,8 @@ function testRiskLoss() {
 }
 
 function resetRiskTest() {
-    const status = TradeRisk.getStatus();
+
+    const status = riskTestManager.getStatus();
 
     if (
         status.cycleStatus === "ACTIVE" &&
@@ -1243,11 +1277,12 @@ function resetRiskTest() {
     ) {
         document.getElementById("riskMessage").textContent =
             "El ciclo ya está reiniciado.";
+
         return;
     }
 
     const result =
-        TradeRisk.resetCycle(status.currentBalance);
+        riskTestManager.resetCycle(status.currentBalance);
 
     updateRiskTest();
 
