@@ -1262,6 +1262,7 @@ function resetRiskTest() {
 ========================================= */
 
 function startEngineTest() {
+
     const result = TradeEngine.start(balance);
 
     if (!result.success) {
@@ -1269,16 +1270,39 @@ function startEngineTest() {
         return;
     }
 
+    const autoResult = TradeEngine.startAuto(
+        generateTestCandles,
+        10
+    );
+
+    if (!autoResult.success) {
+        TradeEngine.stop();
+
+        alert(
+            "No se pudo activar el análisis automático: " +
+            autoResult.reason
+        );
+
+        return;
+    }
+
     updateEngineTest();
 
     escribirLog(
-        "Motor autónomo de prueba iniciado."
+        "Motor autónomo iniciado. Análisis automático cada 10 segundos."
     );
 }
 
 function stopEngineTest() {
+
+    TradeEngine.stopAuto();
     TradeEngine.stop();
+
     updateEngineTest();
+
+    escribirLog(
+        "Motor autónomo detenido."
+    );
 }
 
 function analyzeEngineTest() {
@@ -1543,9 +1567,42 @@ function updateEngineTest() {
 loadState();
 updateUI();
 
-// Actualizar la interfaz cada segundo.
+/*
+ * Actualización visual independiente.
+ *
+ * La interfaz consulta el estado del motor cada segundo.
+ * El motor realiza el análisis según su propio temporizador
+ * de 10 segundos.
+ */
+
 setInterval(() => {
-    updateUI();
+
+    try {
+        updateEngineTest();
+    } catch (error) {
+        console.error(
+            "Error actualizando el panel del motor:",
+            error
+        );
+    }
+
+}, 1000);
+
+/*
+ * Actualización del resto de la interfaz.
+ */
+
+setInterval(() => {
+
+    try {
+        updateUI();
+    } catch (error) {
+        console.error(
+            "Error actualizando la interfaz:",
+            error
+        );
+    }
+
 }, 1000);
 
 </script>
