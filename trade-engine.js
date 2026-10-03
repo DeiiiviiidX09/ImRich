@@ -1,9 +1,9 @@
 
 /*
  * TRADE AI
- * Motor central v2.0
- * Análisis y operaciones automáticas.
- * Solo simulación.
+ * Motor central v2.1
+ * Supervisión global de riesgo.
+ * Simulación exclusivamente.
  */
 
 const TradeEngine = (() => {
@@ -67,69 +67,144 @@ const TradeEngine = (() => {
         }
     }
 
-    // Procesar resultados de posiciones cerradas
-    function processClosedPositions(closedPositions) {
+    // Sumar resultados de varias posiciones
+    function sumProfitLoss(positions) {
 
-        for (const position of closedPositions) {
-
-            const result = risk.recordTrade(
-                position.profitLoss
-            );
-
-            logDecision(
-                position.pair + " cerrada. Resultado: " +
-                (position.profitLoss >= 0 ? "+" : "") +
-                "$" + position.profitLoss.toFixed(2)
-            );
-
-            if (result.cycleStatus === "TAKE_PROFIT") {
-
-                engineStatus = "WAITING";
-                stopAuto();
-
-                logDecision(
-                    "Objetivo del ciclo alcanzado."
-                );
-
-                const remaining =
-                    PositionManager.closeAll("CYCLE_TAKE_PROFIT");
-
-                settleRemainingPositions(remaining);
-
-                break;
-
-            } else if (result.cycleStatus === "LOSS_LIMIT") {
-
-                engineStatus = "RESTART_REQUIRED";
-                stopAuto();
-
-                logDecision(
-                    "Límite de pérdidas del ciclo alcanzado."
-                );
-
-                const remaining =
-                    PositionManager.closeAll("CYCLE_LOSS_LIMIT");
-
-                settleRemainingPositions(remaining);
-
-                break;
-            }
-        }
+        return positions.reduce(
+            (total, position) =>
+                total + position.profitLoss,
+            0
+        );
     }
 
-    // Registrar el resultado de las posiciones restantes
-    function settleRemainingPositions(positions) {
+    // Procesar posiciones cerradas y vigilar el ciclo
+    function processClosedPositions(closedPositions = []) {
 
-        for (const position of positions) {
+        if (engineStatus !== "RUNNING") {
+            return;
+        }
 
-            risk.recordTrade(position.profitLoss);
+        const status = risk.getStatus();
 
-            logDecision(
-                position.pair +
-                " cerrada por límite global. Resultado: " +
-                (position.profitLoss >= 0 ? "+" : "") +
-                "$" + position.profitLoss.toFixed(2)
-            );
+        const newRealized =
+            sumProfitLoss(closedPositions);
+
+        const floating =
+            PositionManager.getTotalUnrealizedProfitLoss();
+
+        const projectedProfitLoss =
+            status.cycleProfitLoss +
+            newRealized +
+            floating;
+
+        const targetReached =
+            projectedProfitLoss >= status.profitTarget;
+
+        const lossLimitReached =
+            projectedProfitLoss <= -status.lossLimit;
+
+        // Si se alcanza un límite global, cerrar todo
+        if (targetReached || lossLimitReached) {
+
+            const reason = targetReached
+                ? "CYCLE_TAKE_PROFIT"
+                : "CYCLE_LOSS_LIMIT";
+
+            const remaining =
+                PositionManager.closeAll(reason);
+
+            const allClosed = [
+                ...closedPositions,
+                ...remaining
+            ];
+
+            const finalProfitLoss =
+                sumProfitLoss(allClosed);
+
+            // Registrar el resultado total una sola vez
+            const finalStatus =
+                risk.recordTrade(finalProfitLoss);
+
+            for (const position of allClosed) {
+
+                logDecision(
+                    position.pair +
+                    " cerrada por límite global. Resultado: " +
+                    (position.profitLoss >= 0 ? "+" : "") +
+                    "$" + position.profitLoss.toFixed(2)
+                );
+            }
+
+            stopAuto();
+
+            if (targetReached) {
+
+                engineStatus = "WAITING";
+
+                logDecision(
+                    "Objetivo global alcanzado. " +
+                    "Todas las posiciones fueron cerradas."
+                );
+
+            } else {
+
+                engineStatus = "RESTART_REQUIRED";
+
+                logDecision(
+                    "Límite global de pérdidas alcanzado. " +
+                    "Todas las posiciones fueron cerradas."
+                );
+            }
+
+            return finalStatus;
+        }
+
+        // Si no se alcanzó ningún límite, registrar
+        // únicamente las posiciones que se cerraron
+        if (closedPositions.length > 0) {
+
+            const result =
+                risk.recordTrade(newRealized);
+
+            for (const position of closedPositions) {
+
+                logDecision(
+                    position.pair +
+                    " cerrada. Resultado: " +
+                    (position.profitLoss >= 0 ? "+" : "") +
+                    "$" + position.profitLoss.toFixed(2)
+                );
+            }
+
+            // Protección adicional por si el gestor
+            // detecta un límite con el resultado realizado
+            if (result.cycleStatus !== "ACTIVE") {
+
+                engineStatus =
+                    result.cycleStatus === "TAKE_PROFIT"
+                        ? "WAITING"
+                        : "RESTART_REQUIRED";
+
+                stopAuto();
+
+                const remaining =
+                    PositionManager.closeAll(
+                        "CYCLE_LIMIT"
+                    );
+
+                logDecision(
+                    "El gestor de riesgo detuvo el ciclo."
+                );
+
+                for (const position of remaining) {
+                    logDecision(
+                        position.pair +
+                        " cerrada. Resultado: " +
+                        (position.profitLoss >= 0 ? "+" : "") +
+                        "$" + position.profitLoss.toFixed(2)
+                    );
+                }
+            }
         }
     }
 
@@ -158,26 +233,28 @@ const TradeEngine = (() => {
             result.reason
         );
 
-        if (!result.price || !Number.isFinite(result.price)) {
+        if (
+            !result.price ||
+            !Number.isFinite(result.price)
+        ) {
             return result;
         }
 
-        // Actualizar posiciones abiertas con el precio más reciente
+        // Actualizar las posiciones del par
         const closed = PositionManager.updatePrice(
             pair,
             result.price
         );
 
-        if (closed.length > 0) {
-            processClosedPositions(closed);
-        }
+        // Comprobar límites globales, incluso si
+        // ninguna posición se ha cerrado
+        processClosedPositions(closed);
 
-        // No abrir nuevas posiciones si el ciclo terminó
+        // No abrir operaciones si el ciclo terminó
         if (engineStatus !== "RUNNING") {
             return result;
         }
 
-        // Solo abrir si hay señal válida
         if (
             result.signal !== "BUY" &&
             result.signal !== "SELL"
@@ -188,7 +265,6 @@ const TradeEngine = (() => {
         const openPositions =
             PositionManager.getOpenPositions();
 
-        // Evitar varias posiciones simultáneas en el mismo par
         const alreadyOpen = openPositions.some(
             position => position.pair === pair
         );
@@ -216,10 +292,12 @@ const TradeEngine = (() => {
         );
 
         if (amount <= 0) {
+
             logDecision(
                 "Capital disponible insuficiente para abrir " +
                 pair
             );
+
             return result;
         }
 
@@ -299,9 +377,11 @@ const TradeEngine = (() => {
                         !Array.isArray(candles) ||
                         candles.length === 0
                     ) {
+
                         logDecision(
                             pair + ": no hay datos disponibles."
                         );
+
                         continue;
                     }
 
@@ -384,9 +464,19 @@ const TradeEngine = (() => {
     // Consultar estado completo
     function getStatus() {
 
+        const riskStatus = risk.getStatus();
+
+        const floating =
+            PositionManager.getTotalUnrealizedProfitLoss();
+
         return {
             engineStatus,
-            risk: risk.getStatus(),
+            risk: {
+                ...riskStatus,
+                floatingProfitLoss: floating,
+                projectedCycleProfitLoss:
+                    riskStatus.cycleProfitLoss + floating
+            },
             lastSignals,
             decisions,
             autoRunning: autoTimer !== null,
