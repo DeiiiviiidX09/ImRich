@@ -1,10 +1,16 @@
 
 /*
  * TRADE AI
- * Motor autónomo v4.0
+ * Motor autónomo v5.0
  *
  * Simulación exclusivamente.
  * No ejecuta órdenes reales ni se conecta a un broker.
+ *
+ * Configuración:
+ * - Capital inicial: $100
+ * - Apalancamiento: 1:30
+ * - Objetivo neto por ciclo: +$0.20
+ * - Pérdida máxima por ciclo: -$5.00
  */
 
 const TradeEngine = (() => {
@@ -32,6 +38,13 @@ const TradeEngine = (() => {
 
     const MAX_POSITIONS = 10;
     const POSITION_FRACTION = 0.10;
+
+    const CONFIG = {
+        startingCapital: 100,
+        leverage: 30,
+        profitTarget: 0.20,
+        maxLoss: 5.00
+    };
 
     // --------------------------------------------------
     // REGISTRO DE DECISIONES
@@ -98,9 +111,7 @@ const TradeEngine = (() => {
         const closed = PositionManager.getHistory();
         const open = PositionManager.getOpenPositions();
 
-        const allPositions = [...closed, ...open];
-
-        const positionWins = allPositions.reduce(
+        const positionWins = closed.reduce(
             (total, position) =>
                 total + Math.max(
                     0,
@@ -109,7 +120,7 @@ const TradeEngine = (() => {
             0
         );
 
-        const positionLosses = allPositions.reduce(
+        const positionLosses = closed.reduce(
             (total, position) =>
                 total + Math.abs(
                     Math.min(
@@ -157,31 +168,38 @@ const TradeEngine = (() => {
 
     function finishCycle(reason) {
 
-        if (!risk) return;
+        if (!risk || engineStatus !== "RUNNING") {
+            return;
+        }
 
         const openPositions = getCurrentCyclePositions();
 
+        /*
+         * Cierra las posiciones del ciclo actual.
+         * PositionManager conserva el último resultado
+         * calculado para cada posición.
+         */
+
         if (openPositions.length > 0) {
 
-            // Cierra únicamente las posiciones abiertas
-            // pertenecientes al ciclo actual.
-            openPositions.forEach(position => {
-                PositionManager.updatePrice(
-                    position.pair,
-                    position.currentPrice
-                );
-            });
-
             PositionManager.closeAll(reason);
+
         }
+
+        /*
+         * Recalcular el resultado después del cierre.
+         * El resultado de las posiciones cerradas se conserva
+         * en el historial y no debe sumarse dos veces.
+         */
 
         const finalPL = calculateCyclePL();
 
-        /*
-         * Si el gestor de riesgo ya alcanzó un límite,
-         * conserva ese estado y su resultado final.
-         */
         const statusBefore = risk.getStatus();
+
+        /*
+         * Si el ciclo sigue activo, actualizamos el resultado.
+         * Si ya alcanzó un límite, conservamos ese estado.
+         */
 
         if (statusBefore.cycleStatus === "ACTIVE") {
             risk.updateCycleProfitLoss(finalPL);
@@ -190,8 +208,11 @@ const TradeEngine = (() => {
         engineStatus = "WAITING";
         lastCycleEndTime = Date.now();
 
+        const finalBalance =
+            risk.getStatus().startingBalance + finalPL;
+
         log(
-            `Ciclo finalizado: ${reason}. Resultado final: ${finalPL.toFixed(4)} USD.`,
+            `Ciclo finalizado: ${reason}. Resultado neto: ${finalPL.toFixed(4)} USD. Balance: ${finalBalance.toFixed(4)} USD.`,
             "warning"
         );
     }
@@ -236,7 +257,9 @@ const TradeEngine = (() => {
         }
 
         const status = risk.getStatus();
-        const remainingBalance = Number(status.currentBalance);
+
+        const remainingBalance =
+            Number(status.currentBalance);
 
         if (
             !Number.isFinite(remainingBalance) ||
@@ -249,9 +272,10 @@ const TradeEngine = (() => {
         }
 
         /*
-         * Conserva el historial cerrado.
-         * Limpia únicamente posiciones que estén abiertas.
+         * Elimina posiciones abiertas antiguas.
+         * Conserva el historial de operaciones cerradas.
          */
+
         PositionManager.reset(false);
 
         cyclePositionIds.clear();
@@ -277,7 +301,7 @@ const TradeEngine = (() => {
     // INICIAR MOTOR
     // --------------------------------------------------
 
-    function start(capital) {
+    function start(capital = CONFIG.startingCapital) {
 
         const amount = Number(capital);
 
@@ -290,16 +314,10 @@ const TradeEngine = (() => {
 
         stopAuto();
 
-        /*
-         * Se crea un gestor de riesgo nuevo para el motor.
-         */
         risk = TradeRisk.createManager();
+
         risk.startCycle(amount);
 
-        /*
-         * Se conservan operaciones cerradas anteriores,
-         * pero se eliminan posiciones abiertas antiguas.
-         */
         PositionManager.reset(false);
 
         cyclePositionIds.clear();
@@ -312,7 +330,7 @@ const TradeEngine = (() => {
         lastCycleEndTime = 0;
 
         log(
-            `Motor iniciado con ${amount.toFixed(4)} USD.`,
+            `Motor iniciado con ${amount.toFixed(4)} USD. Objetivo: +${CONFIG.profitTarget.toFixed(2)} USD. Pérdida máxima: -${CONFIG.maxLoss.toFixed(2)} USD. Apalancamiento: ${CONFIG.leverage}x.`,
             "success"
         );
 
@@ -386,21 +404,13 @@ const TradeEngine = (() => {
                 timestamp: new Date().toISOString()
             };
 
-            // 1. Actualizar precio y resultados de posiciones.
-            const closedPositions = PositionManager.updatePrice(
+            // 1. Actualizar precio de las posiciones.
+            PositionManager.updatePrice(
                 pair,
                 currentPrice
             );
 
-            closedPositions.forEach(position => {
-
-                log(
-                    `${pair}: posición cerrada por ${position.closeReason}. Resultado: ${Number(position.profitLoss).toFixed(4)} USD.`,
-                    "info"
-                );
-            });
-
-            // 2. Actualizar el balance y comprobar límites.
+            // 2. Comprobar límites antes de abrir otra posición.
             checkRiskLimits();
 
             if (engineStatus !== "RUNNING") {
@@ -412,7 +422,7 @@ const TradeEngine = (() => {
                 };
             }
 
-            // 3. No abrir posiciones si no hay señal.
+            // 3. Verificar señal.
             if (
                 analysis.signal !== "BUY" &&
                 analysis.signal !== "SELL"
@@ -495,11 +505,6 @@ const TradeEngine = (() => {
                 "success"
             );
 
-            /*
-             * La posición recién abierta comienza con P/L = 0.
-             * No se cierra por cero. El siguiente análisis
-             * actualizará su precio y su resultado.
-             */
             checkRiskLimits();
 
             return {
@@ -758,10 +763,6 @@ const TradeEngine = (() => {
         const cycleProfitLoss =
             calculateCyclePL();
 
-        /*
-         * Capital total del ciclo:
-         * balance inicial + P/L realizado y flotante.
-         */
         const cycleBalance = riskStatus
             ? riskStatus.startingBalance + cycleProfitLoss
             : 0;
@@ -815,7 +816,14 @@ const TradeEngine = (() => {
             lastError,
 
             autoActive: autoTimer !== null,
-            intervalSeconds
+            intervalSeconds,
+
+            config: {
+                startingCapital: CONFIG.startingCapital,
+                leverage: CONFIG.leverage,
+                profitTarget: CONFIG.profitTarget,
+                maxLoss: CONFIG.maxLoss
+            }
         };
     }
 
