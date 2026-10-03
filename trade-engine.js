@@ -1,9 +1,9 @@
 
 /*
  * TRADE AI
- * Motor central v2.2
- * Supervisión global y reinicio automático.
- * Simulación exclusivamente.
+ * Motor central v3.0
+ * Gestión de riesgo y reinicio automático.
+ * Solo simulación.
  */
 
 const TradeEngine = (() => {
@@ -15,6 +15,9 @@ const TradeEngine = (() => {
     let decisions = [];
     let autoTimer = null;
     let analysisRunning = false;
+
+    // Resultado realizado del ciclo actual
+    let cycleRealizedPL = 0;
 
     const pairs = [
         "EUR/USD",
@@ -32,33 +35,25 @@ const TradeEngine = (() => {
             time: new Date().toLocaleTimeString()
         });
 
-        if (decisions.length > 100) {
+        if (decisions.length > 150) {
             decisions.pop();
         }
     }
 
-    // Sumar resultados de varias posiciones
-    function sumProfitLoss(positions) {
-
-        return positions.reduce(
-            (total, position) =>
-                total + position.profitLoss,
-            0
-        );
-    }
-
-    // Iniciar el motor
+    // Iniciar motor
     function start(capital) {
 
         stopAuto();
 
         PositionManager.reset();
+
+        cycleRealizedPL = 0;
+
         risk.startCycle(capital);
 
         engineStatus = "RUNNING";
         lastSignals = {};
         decisions = [];
-        analysisRunning = false;
 
         logDecision(
             "Motor iniciado con capital de $" +
@@ -68,64 +63,80 @@ const TradeEngine = (() => {
         return getStatus();
     }
 
-    // Detener el motor
+    // Detener motor
     function stop() {
 
         stopAuto();
 
         engineStatus = "STOPPED";
 
-        logDecision("Motor detenido manualmente.");
+        logDecision("Motor detenido.");
 
         return getStatus();
     }
 
-    // Comprobar si el motor puede analizar
-    function canAnalyze() {
+    // Actualizar el resultado total del ciclo
+    function updateCycleRisk() {
 
-        return (
-            engineStatus === "RUNNING" ||
-            engineStatus === "WAITING" ||
-            engineStatus === "RESTART_REQUIRED"
-        );
+        const unrealized =
+            PositionManager.getUnrealizedProfitLoss();
+
+        const total =
+            cycleRealizedPL + unrealized;
+
+        const status =
+            risk.updateCycleProfitLoss(total);
+
+        // Si se alcanzó un límite, cerrar todas las posiciones
+        if (
+            status.cycleStatus === "TAKE_PROFIT" ||
+            status.cycleStatus === "LOSS_LIMIT"
+        ) {
+
+            closeCyclePositions(status.cycleStatus);
+        }
+
+        return risk.getStatus();
     }
 
-    // Cerrar posiciones y registrar resultados
-    function closeCycle(closedPositions, reason) {
+    // Cerrar posiciones al alcanzar un límite global
+    function closeCyclePositions(reason) {
 
-        const remaining =
-            PositionManager.closeAll(reason);
+        if (
+            engineStatus === "WAITING" ||
+            engineStatus === "RESTART_REQUIRED"
+        ) {
+            return;
+        }
 
-        const allClosed = [
-            ...closedPositions,
-            ...remaining
-        ];
+        stopAuto();
 
-        const finalProfitLoss =
-            sumProfitLoss(allClosed);
+        const closeReason =
+            reason === "TAKE_PROFIT"
+                ? "CYCLE_TAKE_PROFIT"
+                : "CYCLE_LOSS_LIMIT";
 
-        // Registrar todos los resultados una sola vez
-        const finalStatus =
-            risk.recordTrade(finalProfitLoss);
+        const closed =
+            PositionManager.closeAll(closeReason);
 
-        for (const position of allClosed) {
+        for (const position of closed) {
+
+            cycleRealizedPL += position.profitLoss;
 
             logDecision(
                 position.pair +
-                " cerrada. Resultado: " +
+                " cerrada por límite global. Resultado: " +
                 (position.profitLoss >= 0 ? "+" : "") +
                 "$" + position.profitLoss.toFixed(2)
             );
         }
 
-        if (reason === "CYCLE_TAKE_PROFIT") {
+        if (reason === "TAKE_PROFIT") {
 
             engineStatus = "WAITING";
 
             logDecision(
-                "Objetivo del ciclo alcanzado. " +
-                "Todas las posiciones cerradas. " +
-                "Esperando nuevas condiciones."
+                "Objetivo alcanzado. Todas las posiciones cerradas. Esperando nuevas condiciones."
             );
 
         } else {
@@ -133,69 +144,26 @@ const TradeEngine = (() => {
             engineStatus = "RESTART_REQUIRED";
 
             logDecision(
-                "Límite global de pérdidas alcanzado. " +
-                "Todas las posiciones cerradas. " +
-                "Esperando nuevas condiciones."
+                "Límite de pérdidas alcanzado. Todas las posiciones cerradas. Esperando una nueva señal para reiniciar."
+            );
+        }
+    }
+
+    // Registrar posiciones cerradas individualmente
+    function processClosedPositions(closedPositions) {
+
+        for (const position of closedPositions) {
+
+            cycleRealizedPL += position.profitLoss;
+
+            logDecision(
+                position.pair + " cerrada. Resultado: " +
+                (position.profitLoss >= 0 ? "+" : "") +
+                "$" + position.profitLoss.toFixed(2)
             );
         }
 
-        return finalStatus;
-    }
-
-    // Supervisar el resultado total del ciclo
-    function processClosedPositions(closedPositions = []) {
-
-        if (engineStatus !== "RUNNING") {
-            return;
-        }
-
-        const status = risk.getStatus();
-
-        const newlyRealized =
-            sumProfitLoss(closedPositions);
-
-        const floating =
-            PositionManager.getTotalUnrealizedProfitLoss();
-
-        const projectedProfitLoss =
-            status.cycleProfitLoss +
-            newlyRealized +
-            floating;
-
-        const targetReached =
-            projectedProfitLoss >= status.profitTarget;
-
-        const lossLimitReached =
-            projectedProfitLoss <= -status.lossLimit;
-
-        // Comprobar límites globales antes de continuar
-        if (targetReached || lossLimitReached) {
-
-            const reason = targetReached
-                ? "CYCLE_TAKE_PROFIT"
-                : "CYCLE_LOSS_LIMIT";
-
-            closeCycle(closedPositions, reason);
-
-            return;
-        }
-
-        // Si no se alcanzó ningún límite,
-        // registrar las operaciones que se cerraron
-        if (closedPositions.length > 0) {
-
-            risk.recordTrade(newlyRealized);
-
-            for (const position of closedPositions) {
-
-                logDecision(
-                    position.pair +
-                    " cerrada. Resultado: " +
-                    (position.profitLoss >= 0 ? "+" : "") +
-                    "$" + position.profitLoss.toFixed(2)
-                );
-            }
-        }
+        updateCycleRisk();
     }
 
     // Reiniciar ciclo con el capital restante
@@ -210,14 +178,9 @@ const TradeEngine = (() => {
             return getStatus();
         }
 
-        if (
-            !Number.isFinite(status.currentBalance) ||
-            status.currentBalance <= 0
-        ) {
+        if (status.currentBalance <= 0) {
 
             engineStatus = "STOPPED";
-
-            stopAuto();
 
             logDecision(
                 "Capital insuficiente. Motor detenido."
@@ -226,7 +189,10 @@ const TradeEngine = (() => {
             return getStatus();
         }
 
+        // El gestor conserva el historial cerrado
         PositionManager.reset();
+
+        cycleRealizedPL = 0;
 
         risk.resetCycle(status.currentBalance);
 
@@ -234,18 +200,20 @@ const TradeEngine = (() => {
         lastSignals = {};
 
         logDecision(
-            "Nuevo ciclo iniciado automáticamente con $" +
+            "Nuevo ciclo iniciado con $" +
             status.currentBalance.toFixed(2)
         );
 
         return getStatus();
     }
 
-    // Analizar un par y gestionar sus posiciones
+    // Analizar un par
     function analyzePair(pair, candles) {
 
-        if (!canAnalyze()) {
-
+        if (
+            engineStatus === "STOPPED" ||
+            engineStatus === "ERROR"
+        ) {
             return {
                 signal: "WAIT",
                 reason: "El motor está detenido."
@@ -274,46 +242,48 @@ const TradeEngine = (() => {
             return result;
         }
 
-        // Si el ciclo está esperando, no abrir posiciones
-        // hasta recibir una señal válida
+        // Si el ciclo terminó, esperar una señal válida
         if (
             engineStatus === "WAITING" ||
             engineStatus === "RESTART_REQUIRED"
         ) {
 
             if (
-                result.signal !== "BUY" &&
-                result.signal !== "SELL"
+                result.signal === "BUY" ||
+                result.signal === "SELL"
             ) {
+
+                logDecision(
+                    "Nueva señal válida detectada. Preparando reinicio del ciclo."
+                );
+
+                restartCycle();
+            } else {
                 return result;
             }
-
-            logDecision(
-                "Nueva señal válida detectada. " +
-                "Preparando reinicio del ciclo."
-            );
-
-            restartCycle();
         }
 
         if (engineStatus !== "RUNNING") {
             return result;
         }
 
-        // Actualizar posiciones abiertas
+        // Actualizar precios de posiciones abiertas
         const closed = PositionManager.updatePrice(
             pair,
             result.price
         );
 
-        // Comprobar beneficio y pérdida global
-        processClosedPositions(closed);
+        if (closed.length > 0) {
+            processClosedPositions(closed);
+        } else {
+            updateCycleRisk();
+        }
 
+        // No abrir operaciones si el ciclo terminó
         if (engineStatus !== "RUNNING") {
             return result;
         }
 
-        // Solo abrir posiciones con señal válida
         if (
             result.signal !== "BUY" &&
             result.signal !== "SELL"
@@ -387,14 +357,13 @@ const TradeEngine = (() => {
         return result;
     }
 
-    // Activar análisis automático
+    // Análisis automático
     function startAuto(
         candleProvider,
-        intervalSeconds = 30
+        intervalSeconds = 10
     ) {
 
-        if (!canAnalyze()) {
-
+        if (engineStatus !== "RUNNING") {
             return {
                 success: false,
                 reason: "Primero debes iniciar el motor."
@@ -402,10 +371,19 @@ const TradeEngine = (() => {
         }
 
         if (typeof candleProvider !== "function") {
-
             return {
                 success: false,
                 reason: "No se encontró el proveedor de datos."
+            };
+        }
+
+        if (
+            !Number.isFinite(intervalSeconds) ||
+            intervalSeconds < 1
+        ) {
+            return {
+                success: false,
+                reason: "Intervalo no válido."
             };
         }
 
@@ -418,13 +396,15 @@ const TradeEngine = (() => {
 
         async function runAnalysis() {
 
-            if (!canAnalyze()) {
-                stopAuto();
+            if (analysisRunning) {
                 return;
             }
 
-            // Evitar que se solapen dos ciclos de análisis
-            if (analysisRunning) {
+            if (
+                engineStatus === "STOPPED" ||
+                engineStatus === "ERROR"
+            ) {
+                stopAuto();
                 return;
             }
 
@@ -434,7 +414,10 @@ const TradeEngine = (() => {
 
                 for (const pair of pairs) {
 
-                    if (!canAnalyze()) {
+                    if (
+                        engineStatus === "STOPPED" ||
+                        engineStatus === "ERROR"
+                    ) {
                         break;
                     }
 
@@ -461,21 +444,20 @@ const TradeEngine = (() => {
                     } catch (error) {
 
                         logDecision(
-                            "Error analizando " + pair +
-                            ": " + error.message
+                            "Error analizando " +
+                            pair + ": " + error.message
                         );
                     }
                 }
-
-            } finally {
-
-                analysisRunning = false;
 
                 if (
                     typeof updateEngineTest === "function"
                 ) {
                     updateEngineTest();
                 }
+
+            } finally {
+                analysisRunning = false;
             }
         }
 
@@ -496,76 +478,25 @@ const TradeEngine = (() => {
     function stopAuto() {
 
         if (autoTimer !== null) {
-
             clearInterval(autoTimer);
             autoTimer = null;
         }
     }
 
-    // Registrar un resultado para pruebas manuales
-    function recordResult(profitLoss) {
-
-        if (engineStatus !== "RUNNING") {
-            return getStatus();
-        }
-
-        if (!Number.isFinite(profitLoss)) {
-            throw new Error("Resultado no válido.");
-        }
-
-        const result = risk.recordTrade(profitLoss);
-
-        logDecision(
-            "Resultado manual de prueba: " +
-            (profitLoss >= 0 ? "+" : "") +
-            "$" + profitLoss.toFixed(2)
-        );
-
-        if (result.cycleStatus === "TAKE_PROFIT") {
-
-            closeCycle([], "CYCLE_TAKE_PROFIT");
-
-        } else if (result.cycleStatus === "LOSS_LIMIT") {
-
-            closeCycle([], "CYCLE_LOSS_LIMIT");
-        }
-
-        return getStatus();
-    }
-
-    // Estado completo del motor
+    // Consultar estado
     function getStatus() {
-
-        const riskStatus = risk.getStatus();
-
-        const floating =
-            PositionManager.getTotalUnrealizedProfitLoss();
 
         return {
             engineStatus,
-
-            risk: {
-                ...riskStatus,
-
-                floatingProfitLoss: floating,
-
-                projectedCycleProfitLoss:
-                    riskStatus.cycleProfitLoss + floating
-            },
-
+            risk: risk.getStatus(),
             lastSignals,
             decisions,
-
             autoRunning: autoTimer !== null,
-
-            positions:
-                PositionManager.getOpenPositions(),
-
-            history:
-                PositionManager.getHistory(),
-
-            totalMargin:
-                PositionManager.getTotalMargin()
+            positions: PositionManager.getOpenPositions(),
+            history: PositionManager.getHistory(),
+            totalMargin: PositionManager.getTotalMargin(),
+            unrealizedProfitLoss:
+                PositionManager.getUnrealizedProfitLoss()
         };
     }
 
@@ -576,7 +507,6 @@ const TradeEngine = (() => {
         startAuto,
         stopAuto,
         restartCycle,
-        recordResult,
         getStatus
     };
 
