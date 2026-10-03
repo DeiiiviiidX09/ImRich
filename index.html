@@ -1,146 +1,203 @@
 <!DOCTYPE html>
+
 <html lang="es">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Trade AI</title>
 
 <style>
 
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
+
     margin: 0;
+
     background: #080b10;
+
     color: white;
+
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
 }
 
 .app {
+
     max-width: 600px;
+
     margin: auto;
+
     padding: 22px;
+
 }
 
-.header {
-    margin-bottom: 25px;
-}
+.header { margin-bottom: 25px; }
 
-.header h1 {
-    margin: 0;
-    font-size: 34px;
-}
+.header h1 { margin: 0; font-size: 34px; }
 
-.header p {
-    color: #8993a3;
-    margin-top: 5px;
-}
+.header p { color: #8993a3; margin-top: 5px; }
 
 .card {
+
     background: #141922;
+
     border-radius: 20px;
+
     padding: 20px;
+
     margin-bottom: 15px;
+
     border: 1px solid #222a36;
+
 }
 
 .label {
+
     color: #8993a3;
+
     font-size: 13px;
+
 }
 
 .balance {
+
     font-size: 38px;
+
     font-weight: 700;
+
     margin-top: 5px;
+
 }
 
 .status {
+
     display: flex;
+
     align-items: center;
+
     gap: 8px;
+
     margin-bottom: 20px;
+
 }
 
 .status-dot {
+
     width: 10px;
+
     height: 10px;
+
     border-radius: 50%;
+
     background: #777;
+
 }
 
-.status-text {
-    font-size: 14px;
-}
+.status-text { font-size: 14px; }
 
 .grid {
+
     display: grid;
+
     grid-template-columns: 1fr 1fr;
+
     gap: 12px;
+
 }
 
 .metric {
+
     background: #1b222d;
+
     padding: 15px;
+
     border-radius: 15px;
+
 }
 
 .metric-value {
+
     font-size: 22px;
+
     font-weight: 700;
+
     margin-top: 5px;
+
 }
 
-button {
+button, select, input {
+
     width: 100%;
-    padding: 16px;
+
+    padding: 15px;
+
     border: 0;
-    border-radius: 14px;
-    margin-top: 12px;
+
+    border-radius: 12px;
+
+    margin-top: 10px;
+
     font-size: 16px;
-    font-weight: 700;
+
 }
 
-.start {
-    background: white;
-    color: black;
-}
+button { font-weight: 700; cursor: pointer; }
 
-.stop {
-    background: #292f39;
+button:disabled { opacity: .35; }
+
+.start { background: white; color: black; }
+
+.stop { background: #292f39; color: white; }
+
+.emergency { background: #451b1b; color: #ff7777; }
+
+.buy { background: #145b3b; color: #75f0ae; }
+
+.sell { background: #612626; color: #ffaaaa; }
+
+.simulate { background: #28364d; color: #d7e5ff; }
+
+.reset { background: #292f39; color: white; }
+
+input, select {
+
+    background: #252d39;
+
     color: white;
-}
 
-.emergency {
-    background: #451b1b;
-    color: #ff7777;
+    border: 1px solid #394454;
+
 }
 
 .operation {
+
     display: flex;
+
     justify-content: space-between;
+
+    gap: 10px;
+
     padding: 15px 0;
+
     border-bottom: 1px solid #252c36;
+
 }
 
-.profit {
-    color: #50d890;
-}
+.profit { color: #50d890; }
 
-.loss {
-    color: #ff6262;
-}
+.loss { color: #ff6262; }
 
-.log {
-    color: #8993a3;
-    font-size: 13px;
-    line-height: 1.7;
-}
+.log { color: #aab4c2; font-size: 13px; line-height: 1.8; }
+
+.small { color: #8993a3; font-size: 12px; line-height: 1.5; }
 
 </style>
+
 </head>
 
 <body>
@@ -151,264 +208,408 @@ button {
 
         <h1>Trade AI</h1>
 
-        <p>Forex Automated Trading</p>
+        <p>Forex Automated Trading · Simulador</p>
 
     </div>
-
 
     <div class="card">
 
         <div class="status">
 
-            <div
-                class="status-dot"
-                id="statusDot">
+            <div class="status-dot" id="statusDot"></div>
+
+            <div class="status-text" id="statusText">Robot detenido</div>
+
+        </div>
+
+        <div class="label">Capital de simulación</div>
+
+        <div class="balance" id="balance">$100.00</div>
+
+        <div class="grid" style="margin-top:20px">
+
+            <div class="metric">
+
+                <div class="label">Ganancia / pérdida</div>
+
+                <div class="metric-value" id="totalPL">$0.00</div>
+
             </div>
 
-            <div
-                class="status-text"
-                id="statusText">
-                Robot detenido
+            <div class="metric">
+
+                <div class="label">Operaciones cerradas</div>
+
+                <div class="metric-value" id="closedCount">0</div>
+
             </div>
 
         </div>
 
+        <button class="start" onclick="startRobot()">ACTIVAR ROBOT</button>
 
-        <div class="label">
-            Capital de referencia
-        </div>
+        <button class="stop" onclick="stopRobot()">DETENER ROBOT</button>
 
-        <div class="balance">
-            $100.00
-        </div>
-
-
-        <button
-            class="start"
-            onclick="startRobot()">
-
-            ACTIVAR ROBOT
-
-        </button>
-
-
-        <button
-            class="stop"
-            onclick="stopRobot()">
-
-            DETENER ROBOT
-
-        </button>
-
-
-        <button
-            class="emergency"
-            onclick="emergencyStop()">
-
-            PARADA DE EMERGENCIA
-
-        </button>
+        <button class="emergency" onclick="emergencyStop()">PARADA DE EMERGENCIA</button>
 
     </div>
-
-
 
     <div class="grid">
 
         <div class="metric">
 
-            <div class="label">
-                Objetivo
-            </div>
+            <div class="label">Take Profit</div>
 
-            <div class="metric-value">
-                +10%
-            </div>
+            <div class="metric-value profit">+10%</div>
 
         </div>
-
 
         <div class="metric">
 
-            <div class="label">
-                Stop Loss
-            </div>
+            <div class="label">Stop Loss</div>
 
-            <div class="metric-value">
-                -20%
-            </div>
+            <div class="metric-value loss">-20%</div>
 
         </div>
 
     </div>
-
-
 
     <div class="card">
 
-        <h2>Operaciones</h2>
+        <h2>Nueva operación</h2>
 
-        <div
-            class="operation">
+        <label class="label" for="pair">Par de divisas</label>
 
-            <span>
-                EUR/USD
-            </span>
+        <select id="pair">
 
-            <span
-                id="eur"
-                class="profit">
+            <option>EUR/USD</option>
 
-                Sin operación
+            <option>GBP/USD</option>
 
-            </span>
+            <option>USD/JPY</option>
 
-        </div>
+        </select>
 
+        <label class="label" for="direction">Dirección</label>
 
-        <div
-            class="operation">
+        <select id="direction">
 
-            <span>
-                GBP/USD
-            </span>
+            <option value="Compra">Compra (Buy)</option>
 
-            <span
-                id="gbp"
-                class="profit">
+            <option value="Venta">Venta (Sell)</option>
 
-                Sin operación
+        </select>
 
-            </span>
+        <label class="label" for="amount">Cantidad invertida (USD)</label>
 
-        </div>
+        <input id="amount" type="number" min="1" step="1" value="10">
 
+        <button class="buy" id="openBtn" onclick="openTrade()">ABRIR OPERACIÓN</button>
 
-        <div
-            class="operation">
-
-            <span>
-                USD/JPY
-            </span>
-
-            <span
-                id="jpy"
-                class="profit">
-
-                Sin operación
-
-            </span>
-
-        </div>
+        <p class="small">Solo se permite una operación abierta a la vez en esta versión de prueba.</p>
 
     </div>
 
+    <div class="card">
 
+        <h2>Operación activa</h2>
+
+        <div id="activeTrade">No hay ninguna operación abierta.</div>
+
+        <button class="simulate" id="tpBtn" onclick="simulateResult(10)" disabled>
+
+            SIMULAR TAKE PROFIT (+10%)
+
+        </button>
+
+        <button class="simulate" id="slBtn" onclick="simulateResult(-20)" disabled>
+
+            SIMULAR STOP LOSS (-20%)
+
+        </button>
+
+        <p class="small">Estos botones simulan que el mercado ha alcanzado el objetivo o el límite de pérdida. No representan precios de mercado reales.</p>
+
+    </div>
+
+    <div class="card">
+
+        <h2>Historial de operaciones</h2>
+
+        <div id="history" class="log">Todavía no hay operaciones.</div>
+
+    </div>
 
     <div class="card">
 
         <h2>Registro del robot</h2>
 
-        <div
-            id="log"
-            class="log">
+        <div id="log" class="log">Sistema preparado. Esperando activación.</div>
 
-            Sistema preparado.<br>
-            Esperando activación.
-
-        </div>
+        <button class="reset" onclick="resetSimulation()">REINICIAR SIMULACIÓN</button>
 
     </div>
 
 </div>
 
-
-
 <script>
+
+let balance = 100;
+
+let totalPL = 0;
+
+let closedCount = 0;
 
 let robotActivo = false;
 
+let emergencia = false;
+
+let activeTrade = null;
+
+let history = [];
+
+function money(value) {
+
+    return "$" + value.toFixed(2);
+
+}
 
 function escribirLog(texto) {
 
-    const log =
-        document.getElementById("log");
+    const log = document.getElementById("log");
 
-    const hora =
-        new Date().toLocaleTimeString();
+    const hora = new Date().toLocaleTimeString();
 
-    log.innerHTML =
-        "[" + hora + "] " +
-        texto +
-        "<br>" +
-        log.innerHTML;
+    log.innerHTML = "[" + hora + "] " + texto + "<br>" + log.innerHTML;
 
 }
 
+function updateUI() {
+
+    document.getElementById("balance").textContent = money(balance);
+
+    const pl = document.getElementById("totalPL");
+
+    pl.textContent = (totalPL >= 0 ? "+" : "") + money(totalPL);
+
+    pl.className = "metric-value " + (totalPL >= 0 ? "profit" : "loss");
+
+    document.getElementById("closedCount").textContent = closedCount;
+
+    document.getElementById("statusText").textContent =
+
+        emergencia ? "PARADA DE EMERGENCIA" :
+
+        robotActivo ? "Robot activo" : "Robot detenido";
+
+    document.getElementById("statusDot").style.background =
+
+        emergencia ? "#ff4444" :
+
+        robotActivo ? "#50d890" : "#777";
+
+    const active = document.getElementById("activeTrade");
+
+    if (activeTrade) {
+
+        active.innerHTML =
+
+            "<div class='operation'><span>Par</span><strong>" + activeTrade.pair + "</strong></div>" +
+
+            "<div class='operation'><span>Dirección</span><strong>" + activeTrade.direction + "</strong></div>" +
+
+            "<div class='operation'><span>Invertido</span><strong>" + money(activeTrade.amount) + "</strong></div>" +
+
+            "<div class='operation'><span>Objetivo de ganancia</span><strong class='profit'>+" + money(activeTrade.amount * 0.10) + "</strong></div>" +
+
+            "<div class='operation'><span>Límite de pérdida</span><strong class='loss'>-" + money(activeTrade.amount * 0.20) + "</strong></div>";
+
+    } else {
+
+        active.textContent = "No hay ninguna operación abierta.";
+
+    }
+
+    document.getElementById("tpBtn").disabled = !activeTrade;
+
+    document.getElementById("slBtn").disabled = !activeTrade;
+
+    document.getElementById("openBtn").disabled = !!activeTrade || emergencia;
+
+    const historyBox = document.getElementById("history");
+
+    if (history.length === 0) {
+
+        historyBox.textContent = "Todavía no hay operaciones.";
+
+    } else {
+
+        historyBox.innerHTML = history.map(item =>
+
+            "<div class='operation'><span>" + item.pair + " · " + item.direction +
+
+            "<br><small>" + item.result + " · " + item.time + "</small></span><strong class='" +
+
+            (item.pl >= 0 ? "profit" : "loss") + "'>" +
+
+            (item.pl >= 0 ? "+" : "") + money(item.pl) + "</strong></div>"
+
+        ).join("");
+
+    }
+
+}
 
 function startRobot() {
 
+    emergencia = false;
+
     robotActivo = true;
 
-    document.getElementById(
-        "statusText"
-    ).innerText =
-        "Robot activo";
+    escribirLog("Robot activado en modo de simulación.");
 
-    document.getElementById(
-        "statusDot"
-    ).style.background =
-        "#50d890";
-
-    escribirLog(
-        "Robot activado."
-    );
+    updateUI();
 
 }
-
 
 function stopRobot() {
 
     robotActivo = false;
 
-    document.getElementById(
-        "statusText"
-    ).innerText =
-        "Robot detenido";
+    escribirLog("Robot detenido. Las operaciones abiertas no se cierran automáticamente.");
 
-    document.getElementById(
-        "statusDot"
-    ).style.background =
-        "#777";
-
-    escribirLog(
-        "Robot detenido."
-    );
+    updateUI();
 
 }
-
 
 function emergencyStop() {
 
     robotActivo = false;
 
-    document.getElementById(
-        "statusText"
-    ).innerText =
-        "PARADA DE EMERGENCIA";
+    emergencia = true;
 
-    document.getElementById(
-        "statusDot"
-    ).style.background =
-        "#ff4444";
+    escribirLog("PARADA DE EMERGENCIA. No se pueden abrir nuevas operaciones.");
 
-    escribirLog(
-        "PARADA DE EMERGENCIA ACTIVADA."
-    );
+    updateUI();
 
 }
+
+function openTrade() {
+
+    if (emergencia) {
+
+        escribirLog("No se puede abrir una operación: parada de emergencia activa.");
+
+        return;
+
+    }
+
+    const amount = Number(document.getElementById("amount").value);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+
+        alert("Introduce una cantidad válida.");
+
+        return;
+
+    }
+
+    if (amount > balance) {
+
+        alert("No tienes suficiente saldo para esta operación.");
+
+        return;
+
+    }
+
+    activeTrade = {
+
+        pair: document.getElementById("pair").value,
+
+        direction: document.getElementById("direction").value,
+
+        amount: amount
+
+    };
+
+    escribirLog("Operación simulada abierta en " + activeTrade.pair + " por " + money(amount) + ".");
+
+    updateUI();
+
+}
+
+function simulateResult(percent) {
+
+    if (!activeTrade) return;
+
+    const pl = activeTrade.amount * (percent / 100);
+
+    balance += pl;
+
+    totalPL += pl;
+
+    closedCount++;
+
+    const result = percent > 0 ? "Take Profit" : "Stop Loss";
+
+    history.unshift({
+
+        pair: activeTrade.pair,
+
+        direction: activeTrade.direction,
+
+        pl: pl,
+
+        result: result,
+
+        time: new Date().toLocaleTimeString()
+
+    });
+
+    escribirLog(result + " alcanzado. Resultado simulado: " +
+
+        (pl >= 0 ? "+" : "") + money(pl) + ".");
+
+    activeTrade = null;
+
+    updateUI();
+
+}
+
+function resetSimulation() {
+
+    if (!confirm("¿Seguro que quieres borrar el historial y reiniciar el capital a $100?")) {
+
+        return;
+
+    }
+
+    balance = 100;
+
+    totalPL = 0;
+
+    closedCount = 0;
+
+    robotActivo = false;
+
+    emergencia = false;
+
+    activeTrade = null;
+
+    history = [];
+
+    document.getElementById("log").innerHTML = "Simulación reiniciada.<br>";
+
+    escribirLog("Capital restaurado a $100.");
+
+    updateUI();
+
+}
+
+updateUI();
 
 </script>
 
 </body>
+
 </html>
