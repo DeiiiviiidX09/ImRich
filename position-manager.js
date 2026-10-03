@@ -1,16 +1,19 @@
 
 /*
  * TRADE AI
- * Gestor de posiciones v2.0
+ * Gestor de posiciones v3.0
  * Simulación exclusivamente.
  *
- * Características:
- * - Apalancamiento configurable.
- * - Take Profit y Stop Loss sobre el margen.
+ * Configuración:
+ * - Apalancamiento 1:30.
+ * - Capital inicial gestionado por el motor de riesgo.
+ * - Sin Take Profit ni Stop Loss individuales.
+ * - El motor principal controla los límites del ciclo:
+ *      Ganancia neta: +$0.20
+ *      Pérdida máxima: -$5.00
  * - Cálculo de P/L realizado y flotante.
  * - Conservación del historial entre ciclos.
  * - Validación de precios y cantidades.
- * - Protección contra cierres con resultados inválidos.
  */
 
 const PositionManager = (() => {
@@ -20,11 +23,7 @@ const PositionManager = (() => {
 
     const CONFIG = {
         maxPositions: 20,
-        leverage: 30,
-
-        // Porcentaje del margen, no del movimiento del precio.
-        takeProfitPercent: 0.20,
-        stopLossPercent: 5
+        leverage: 30
     };
 
     function countOpenPositions() {
@@ -92,6 +91,12 @@ const PositionManager = (() => {
      * Calcula el resultado de una posición.
      *
      * P/L = margen × variación del precio × apalancamiento
+     *
+     * Ejemplo:
+     * Margen: $1
+     * Apalancamiento: 30x
+     * Movimiento favorable: 1%
+     * Ganancia: $0.30
      */
 
     function calculateProfitLoss(position, price) {
@@ -153,7 +158,12 @@ const PositionManager = (() => {
 
     /*
      * Actualiza el precio de todas las posiciones abiertas
-     * del par y comprueba sus límites individuales.
+     * de un par.
+     *
+     * IMPORTANTE:
+     * No cierra posiciones individualmente.
+     * El motor principal debe comprobar el P/L neto del ciclo
+     * y ordenar el cierre cuando se alcance +$0.20 o -$5.00.
      */
 
     function updatePrice(pair, price) {
@@ -166,8 +176,6 @@ const PositionManager = (() => {
             return [];
         }
 
-        const closed = [];
-
         positions.forEach(position => {
 
             if (
@@ -178,35 +186,11 @@ const PositionManager = (() => {
             }
 
             updatePositionResult(position, price);
-
-            const profitTarget =
-                position.margin *
-                (CONFIG.takeProfitPercent / 100);
-
-            const lossLimit =
-                position.margin *
-                (CONFIG.stopLossPercent / 100);
-
-            // No cerrar por cero ni por valores insignificantes.
-            if (
-                position.profitLoss >= profitTarget &&
-                position.profitLoss > 0
-            ) {
-
-                closePosition(position, "TAKE_PROFIT");
-                closed.push({ ...position });
-
-            } else if (
-                position.profitLoss <= -lossLimit &&
-                position.profitLoss < 0
-            ) {
-
-                closePosition(position, "STOP_LOSS");
-                closed.push({ ...position });
-            }
         });
 
-        return closed;
+        // Se mantiene el array de retorno para compatibilidad
+        // con el motor de trading existente.
+        return [];
     }
 
     /*
