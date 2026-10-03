@@ -332,6 +332,73 @@ input, select {
 
     </div>
 
+<div class="card">
+
+    <h2>Análisis del mercado</h2>
+
+    <p class="small">
+        Motor de señales Trade AI · Simulación
+    </p>
+
+    <label class="label" for="analysisPair">
+        Par de divisas
+    </label>
+
+    <select id="analysisPair">
+        <option value="EUR/USD">EUR/USD</option>
+        <option value="GBP/USD">GBP/USD</option>
+        <option value="USD/JPY">USD/JPY</option>
+    </select>
+
+    <button class="simulate" onclick="analyzeMarket()">
+        ANALIZAR MERCADO
+    </button>
+
+    <div class="metric" style="margin-top:15px">
+
+        <div class="label">Señal detectada</div>
+
+        <div class="metric-value" id="marketSignal">
+            ESPERANDO ANÁLISIS
+        </div>
+
+        <p class="small" id="signalReason">
+            Pulsa analizar para comenzar.
+        </p>
+
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+
+        <div class="metric">
+            <div class="label">EMA 20</div>
+            <div class="metric-value" id="ema20Value">--</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">EMA 50</div>
+            <div class="metric-value" id="ema50Value">--</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">RSI</div>
+            <div class="metric-value" id="rsiValue">--</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">ATR</div>
+            <div class="metric-value" id="atrValue">--</div>
+        </div>
+
+    </div>
+
+    <p class="small">
+        Los valores mostrados son simulados y no deben utilizarse
+        para tomar decisiones de inversión.
+    </p>
+
+</div>
+
     <div class="card">
 
         <h2>Historial de operaciones</h2>
