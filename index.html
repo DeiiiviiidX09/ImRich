@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Trade AI</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #080b10;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app {
+    max-width: 600px;
+    margin: auto;
+    padding: 22px;
+}
+
+.header {
+    margin-bottom: 25px;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 34px;
+}
+
+.header p {
+    color: #8993a3;
+    margin-top: 5px;
+}
+
+.card {
+    background: #141922;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 15px;
+    border: 1px solid #222a36;
+}
+
+.label {
+    color: #8993a3;
+    font-size: 13px;
+}
+
+.balance {
+    font-size: 38px;
+    font-weight: 700;
+    margin-top: 5px;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #777;
+}
+
+.status-text {
+    font-size: 14px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.metric {
+    background: #1b222d;
+    padding: 15px;
+    border-radius: 15px;
+}
+
+.metric-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 5px;
+}
+
+button {
+    width: 100%;
+    padding: 16px;
+    border: 0;
+    border-radius: 14px;
+    margin-top: 12px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.start {
+    background: white;
+    color: black;
+}
+
+.stop {
+    background: #292f39;
+    color: white;
+}
+
+.emergency {
+    background: #451b1b;
+    color: #ff7777;
+}
+
+.operation {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 0;
+    border-bottom: 1px solid #252c36;
+}
+
+.profit {
+    color: #50d890;
+}
+
+.loss {
+    color: #ff6262;
+}
+
+.log {
+    color: #8993a3;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="header">
+
+        <h1>Trade AI</h1>
+
+        <p>Forex Automated Trading</p>
+
+    </div>
+
+
+    <div class="card">
+
+        <div class="status">
+
+            <div
+                class="status-dot"
+                id="statusDot">
+            </div>
+
+            <div
+                class="status-text"
+                id="statusText">
+                Robot detenido
+            </div>
+
+        </div>
+
+
+        <div class="label">
+            Capital de referencia
+        </div>
+
+        <div class="balance">
+            $100.00
+        </div>
+
+
+        <button
+            class="start"
+            onclick="startRobot()">
+
+            ACTIVAR ROBOT
+
+        </button>
+
+
+        <button
+            class="stop"
+            onclick="stopRobot()">
+
+            DETENER ROBOT
+
+        </button>
+
+
+        <button
+            class="emergency"
+            onclick="emergencyStop()">
+
+            PARADA DE EMERGENCIA
+
+        </button>
+
+    </div>
+
+
+
+    <div class="grid">
+
+        <div class="metric">
+
+            <div class="label">
+                Objetivo
+            </div>
+
+            <div class="metric-value">
+                +10%
+            </div>
+
+        </div>
+
+
+        <div class="metric">
+
+            <div class="label">
+                Stop Loss
+            </div>
+
+            <div class="metric-value">
+                -20%
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card">
+
+        <h2>Operaciones</h2>
+
+        <div
+            class="operation">
+
+            <span>
+                EUR/USD
+            </span>
+
+            <span
+                id="eur"
+                class="profit">
+
+                Sin operación
+
+            </span>
+
+        </div>
+
+
+        <div
+            class="operation">
+
+            <span>
+                GBP/USD
+            </span>
+
+            <span
+                id="gbp"
+                class="profit">
+
+                Sin operación
+
+            </span>
+
+        </div>
+
+
+        <div
+            class="operation">
+
+            <span>
+                USD/JPY
+            </span>
+
+            <span
+                id="jpy"
+                class="profit">
+
+                Sin operación
+
+            </span>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card">
+
+        <h2>Registro del robot</h2>
+
+        <div
+            id="log"
+            class="log">
+
+            Sistema preparado.<br>
+            Esperando activación.
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<script>
+
+let robotActivo = false;
+
+
+function escribirLog(texto) {
+
+    const log =
+        document.getElementById("log");
+
+    const hora =
+        new Date().toLocaleTimeString();
+
+    log.innerHTML =
+        "[" + hora + "] " +
+        texto +
+        "<br>" +
+        log.innerHTML;
+
+}
+
+
+function startRobot() {
+
+    robotActivo = true;
+
+    document.getElementById(
+        "statusText"
+    ).innerText =
+        "Robot activo";
+
+    document.getElementById(
+        "statusDot"
+    ).style.background =
+        "#50d890";
+
+    escribirLog(
+        "Robot activado."
+    );
+
+}
+
+
+function stopRobot() {
+
+    robotActivo = false;
+
+    document.getElementById(
+        "statusText"
+    ).innerText =
+        "Robot detenido";
+
+    document.getElementById(
+        "statusDot"
+    ).style.background =
+        "#777";
+
+    escribirLog(
+        "Robot detenido."
+    );
+
+}
+
+
+function emergencyStop() {
+
+    robotActivo = false;
+
+    document.getElementById(
+        "statusText"
+    ).innerText =
+        "PARADA DE EMERGENCIA";
+
+    document.getElementById(
+        "statusDot"
+    ).style.background =
+        "#ff4444";
+
+    escribirLog(
+        "PARADA DE EMERGENCIA ACTIVADA."
+    );
+
+}
+
+</script>
+
+</body>
+</html>
