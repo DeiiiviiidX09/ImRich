@@ -1137,20 +1137,34 @@ function analyzeMarket() {
     const reasonElement =
         document.getElementById("signalReason");
 
-    signalElement.textContent = result.signal;
-    reasonElement.textContent =
-        result.reason || "Análisis completado.";
+    if (signalElement) {
+        signalElement.textContent =
+            result.signal || "SIN SEÑAL";
 
-    signalElement.style.color =
-        result.signal === "BUY"
-            ? "#50d890"
-            : result.signal === "SELL"
-                ? "#ff6262"
-                : "#ffffff";
+        signalElement.style.color =
+            result.signal === "BUY"
+                ? "#50d890"
+                : result.signal === "SELL"
+                    ? "#ff6262"
+                    : "#ffffff";
+    }
 
-    document.getElementById("marketPrice").textContent =
-        "Precio simulado: " +
-        Number(result.price || 0).toFixed(5);
+    if (reasonElement) {
+        reasonElement.textContent =
+            result.reason || "Análisis completado.";
+    }
+
+    const priceElement =
+        document.getElementById("marketPrice");
+
+    if (priceElement) {
+        const price = Number(result.price);
+
+        priceElement.textContent =
+            Number.isFinite(price)
+                ? "Precio simulado: " + price.toFixed(5)
+                : "Precio simulado: no disponible";
+    }
 
     escribirLog(
         "Análisis simulado de " +
@@ -1170,6 +1184,8 @@ TradeRisk.startCycle(100);
 
 function updateRiskTest() {
     const status = TradeRisk.getStatus();
+
+    if (!status) return;
 
     document.getElementById("riskStatus").textContent =
         status.cycleStatus;
@@ -1330,17 +1346,31 @@ function restartEngineTest() {
 
 function updateEngineTest() {
     const status = TradeEngine.getStatus();
-    const risk = status.risk;
 
-    document.getElementById("engineStatus").textContent =
-        status.engineStatus;
+    if (!status) return;
 
-    document.getElementById("engineBalance").textContent =
-        money(
-            risk
-                ? risk.currentBalance
-                : 0
-        );
+    const risk = status.risk || null;
+
+    const cycleBalance = Number(
+        status.cycleBalance ??
+        (risk ? risk.currentBalance : balance)
+    );
+
+    const balanceElement =
+        document.getElementById("engineBalance");
+
+    if (balanceElement) {
+        balanceElement.textContent =
+            money(cycleBalance);
+    }
+
+    const engineStatusElement =
+        document.getElementById("engineStatus");
+
+    if (engineStatusElement) {
+        engineStatusElement.textContent =
+            status.engineStatus || "DESCONOCIDO";
+    }
 
     const stats = status.allTimeStats || {
         totalWins: 0,
@@ -1348,17 +1378,22 @@ function updateEngineTest() {
         netProfitLoss: 0
     };
 
+    const netProfitLoss =
+        Number(stats.netProfitLoss || 0);
+
     const plElement =
         document.getElementById("enginePL");
 
-    plElement.textContent =
-        signedMoney(stats.netProfitLoss);
+    if (plElement) {
+        plElement.textContent =
+            signedMoney(netProfitLoss);
 
-    plElement.className =
-        "metric-value " +
-        (stats.netProfitLoss >= 0
-            ? "profit"
-            : "loss");
+        plElement.className =
+            "metric-value " +
+            (netProfitLoss >= 0
+                ? "profit"
+                : "loss");
+    }
 
     const signalsBox =
         document.getElementById("engineSignals");
@@ -1366,14 +1401,16 @@ function updateEngineTest() {
     const signals =
         Object.entries(status.lastSignals || {});
 
-    signalsBox.innerHTML = signals.length
-        ? signals.map(([pair, data]) => `
-            <div class="operation">
-                <span>${pair}</span>
-                <strong>${data.signal}</strong>
-            </div>
-        `).join("")
-        : "Todavía no hay señales.";
+    if (signalsBox) {
+        signalsBox.innerHTML = signals.length
+            ? signals.map(([pair, data]) => `
+                <div class="operation">
+                    <span>${pair}</span>
+                    <strong>${data.signal}</strong>
+                </div>
+            `).join("")
+            : "Todavía no hay señales.";
+    }
 
     const positionsBox =
         document.getElementById("enginePositions");
@@ -1381,35 +1418,37 @@ function updateEngineTest() {
     const positions =
         status.openPositions || [];
 
-    positionsBox.innerHTML = positions.length
-        ? positions.map(position => {
-            const pl =
-                Number(position.profitLoss || 0);
+    if (positionsBox) {
+        positionsBox.innerHTML = positions.length
+            ? positions.map(position => {
+                const pl =
+                    Number(position.profitLoss || 0);
 
-            const margin =
-                Number(
-                    position.margin ||
-                    position.amount ||
-                    0
-                );
+                const margin =
+                    Number(
+                        position.margin ||
+                        position.amount ||
+                        0
+                    );
 
-            return `
-                <div class="operation">
-                    <span>
-                        <strong>${position.pair}</strong><br>
-                        Dirección: ${position.direction}<br>
-                        Margen: ${money(margin)}<br>
-                        Entrada: ${Number(position.entryPrice || 0).toFixed(5)}<br>
-                        Precio actual: ${Number(position.currentPrice || 0).toFixed(5)}
-                    </span>
+                return `
+                    <div class="operation">
+                        <span>
+                            <strong>${position.pair}</strong><br>
+                            Dirección: ${position.direction}<br>
+                            Margen: ${money(margin)}<br>
+                            Entrada: ${Number(position.entryPrice || 0).toFixed(5)}<br>
+                            Precio actual: ${Number(position.currentPrice || 0).toFixed(5)}
+                        </span>
 
-                    <strong class="${pl >= 0 ? "profit" : "loss"}">
-                        ${signedMoney(pl)}
-                    </strong>
-                </div>
-            `;
-        }).join("")
-        : "No hay posiciones abiertas.";
+                        <strong class="${pl >= 0 ? "profit" : "loss"}">
+                            ${signedMoney(pl)}
+                        </strong>
+                    </div>
+                `;
+            }).join("")
+            : "No hay posiciones abiertas.";
+    }
 
     const historyBox =
         document.getElementById("enginePositionHistory");
@@ -1417,32 +1456,34 @@ function updateEngineTest() {
     const positionHistory =
         status.allHistory || [];
 
-    historyBox.innerHTML = positionHistory.length
-        ? positionHistory.map(position => {
-            const pl =
-                Number(position.profitLoss || 0);
+    if (historyBox) {
+        historyBox.innerHTML = positionHistory.length
+            ? positionHistory.map(position => {
+                const pl =
+                    Number(position.profitLoss || 0);
 
-            return `
-                <div class="operation">
-                    <span>
-                        <strong>${position.pair}</strong><br>
-                        ${position.direction}<br>
-                        ${position.closeReason || position.status || "Cerrada"}<br>
+                return `
+                    <div class="operation">
+                        <span>
+                            <strong>${position.pair}</strong><br>
+                            ${position.direction}<br>
+                            ${position.closeReason || position.status || "Cerrada"}<br>
 
-                        <small>
-                            ${position.closedAt
-                                ? new Date(position.closedAt).toLocaleString()
-                                : "Fecha no disponible"}
-                        </small>
-                    </span>
+                            <small>
+                                ${position.closedAt
+                                    ? new Date(position.closedAt).toLocaleString()
+                                    : "Fecha no disponible"}
+                            </small>
+                        </span>
 
-                    <strong class="${pl >= 0 ? "profit" : "loss"}">
-                        ${signedMoney(pl)}
-                    </strong>
-                </div>
-            `;
-        }).join("")
-        : "Todavía no hay posiciones cerradas.";
+                        <strong class="${pl >= 0 ? "profit" : "loss"}">
+                            ${signedMoney(pl)}
+                        </strong>
+                    </div>
+                `;
+            }).join("")
+            : "Todavía no hay posiciones cerradas.";
+    }
 
     const logBox =
         document.getElementById("engineLog");
@@ -1450,27 +1491,49 @@ function updateEngineTest() {
     const decisions =
         status.decisionLog || [];
 
-    logBox.innerHTML = decisions.length
-        ? decisions.map(item => `
-            <div>
-                [${new Date(item.timestamp).toLocaleTimeString()}]
-                ${item.message}
-            </div>
-        `).join("")
-        : "Sin decisiones registradas.";
+    if (logBox) {
+        logBox.innerHTML = decisions.length
+            ? decisions.map(item => `
+                <div>
+                    [${new Date(item.timestamp).toLocaleTimeString()}]
+                    ${item.message}
+                </div>
+            `).join("")
+            : "Sin decisiones registradas.";
+    }
 
-    // Mostrar estadísticas acumuladas en el panel de análisis.
-    document.getElementById("analysisBalance").textContent =
-        money(risk ? risk.currentBalance : 0);
+    // Sincronizar las cifras del panel de análisis.
+    const analysisBalance =
+        document.getElementById("analysisBalance");
 
-    document.getElementById("analysisPL").textContent =
-        signedMoney(stats.netProfitLoss);
+    if (analysisBalance) {
+        analysisBalance.textContent =
+            money(cycleBalance);
+    }
 
-    document.getElementById("analysisWins").textContent =
-        "+" + money(stats.totalWins);
+    const analysisPL =
+        document.getElementById("analysisPL");
 
-    document.getElementById("analysisLosses").textContent =
-        "-" + money(stats.totalLosses);
+    if (analysisPL) {
+        analysisPL.textContent =
+            signedMoney(netProfitLoss);
+    }
+
+    const analysisWins =
+        document.getElementById("analysisWins");
+
+    if (analysisWins) {
+        analysisWins.textContent =
+            "+" + money(stats.totalWins);
+    }
+
+    const analysisLosses =
+        document.getElementById("analysisLosses");
+
+    if (analysisLosses) {
+        analysisLosses.textContent =
+            "-" + money(stats.totalLosses);
+    }
 }
 
 /* =========================================
