@@ -401,6 +401,72 @@ input, select {
 
     <div class="card">
 
+<div class="card">
+
+    <h2>Prueba del gestor de riesgo</h2>
+
+    <p class="small">
+        Panel de diagnóstico. No modifica el saldo principal
+        ni ejecuta operaciones reales.
+    </p>
+
+    <div class="metric">
+        <div class="label">Estado del ciclo</div>
+        <div class="metric-value" id="riskStatus">
+            ACTIVO
+        </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+
+        <div class="metric">
+            <div class="label">Capital inicial</div>
+            <div class="metric-value" id="riskStart">
+                $100.00
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Capital actual</div>
+            <div class="metric-value" id="riskBalance">
+                $100.00
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Resultado del ciclo</div>
+            <div class="metric-value" id="riskPL">
+                $0.00
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Acción recomendada</div>
+            <div class="metric-value" id="riskAction">
+                CONTINUE
+            </div>
+        </div>
+
+    </div>
+
+    <button class="buy" onclick="testRiskProfit()">
+        SIMULAR GANANCIA (+$1)
+    </button>
+
+    <button class="sell" onclick="testRiskLoss()">
+        SIMULAR PÉRDIDA (-$0.50)
+    </button>
+
+    <button class="reset" onclick="resetRiskTest()">
+        REINICIAR PRUEBA
+    </button>
+
+    <p class="small" id="riskMessage">
+        Prueba preparada. Capital inicial: $100.
+    </p>
+
+</div>
+
         <h2>Historial de operaciones</h2>
 
         <div id="history" class="log">Todavía no hay operaciones.</div>
@@ -765,6 +831,92 @@ function analyzeMarket() {
         ": " + result.signal +
         ". " + result.reason
     );
+}
+
+// Inicializar el gestor de riesgo de prueba
+TradeRisk.startCycle(100);
+
+
+// Actualizar los datos del panel de riesgo
+function updateRiskTest() {
+
+    const status = TradeRisk.getStatus();
+
+    document.getElementById("riskStatus").textContent =
+        status.cycleStatus;
+
+    document.getElementById("riskStart").textContent =
+        money(status.startingBalance);
+
+    document.getElementById("riskBalance").textContent =
+        money(status.currentBalance);
+
+    document.getElementById("riskPL").textContent =
+        (status.cycleProfitLoss >= 0 ? "+" : "") +
+        money(status.cycleProfitLoss);
+
+    document.getElementById("riskAction").textContent =
+        status.action;
+
+    document.getElementById("riskPL").className =
+        "metric-value " +
+        (status.cycleProfitLoss >= 0 ? "profit" : "loss");
+}
+
+
+// Registrar un resultado de prueba
+function recordRiskTest(amount) {
+
+    const result = TradeRisk.recordTrade(amount);
+
+    updateRiskTest();
+
+    document.getElementById("riskMessage").textContent =
+        "Resultado registrado. Estado: " +
+        result.cycleStatus +
+        ". Acción: " + result.action;
+}
+
+
+// Simular ganancia
+function testRiskProfit() {
+
+    recordRiskTest(1);
+
+}
+
+
+// Simular pérdida
+function testRiskLoss() {
+
+    recordRiskTest(-0.50);
+
+}
+
+
+// Reiniciar la prueba con el capital restante
+function resetRiskTest() {
+
+    const status = TradeRisk.getStatus();
+
+    if (
+        status.cycleStatus === "ACTIVE" &&
+        status.cycleProfitLoss === 0
+    ) {
+        document.getElementById("riskMessage").textContent =
+            "El ciclo ya está reiniciado.";
+        return;
+    }
+
+    const result =
+        TradeRisk.resetCycle(status.currentBalance);
+
+    updateRiskTest();
+
+    document.getElementById("riskMessage").textContent =
+        "Nuevo ciclo iniciado con " +
+        money(result.startingBalance) +
+        ". La progresión de prueba comienza de nuevo.";
 }
 
 // Al abrir la página, recuperar los datos guardados
