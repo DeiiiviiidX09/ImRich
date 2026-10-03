@@ -354,259 +354,255 @@ input, select {
 
 <script>
 
+
 let balance = 100;
-
 let totalPL = 0;
-
 let closedCount = 0;
-
 let robotActivo = false;
-
 let emergencia = false;
-
 let activeTrade = null;
-
 let history = [];
 
+const STORAGE_KEY = "tradeAI_simulation_v1";
+
+// Guardar el estado de la aplicación en el iPhone
+function saveState() {
+    const state = {
+        balance,
+        totalPL,
+        closedCount,
+        robotActivo,
+        emergencia,
+        activeTrade,
+        history
+    };
+
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+        console.error("No se pudo guardar el progreso:", error);
+    }
+}
+
+// Recuperar los datos guardados
+function loadState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (!saved) return;
+
+        const state = JSON.parse(saved);
+
+        if (typeof state.balance === "number") balance = state.balance;
+        if (typeof state.totalPL === "number") totalPL = state.totalPL;
+        if (typeof state.closedCount === "number") closedCount = state.closedCount;
+
+        robotActivo = false;
+        emergencia = Boolean(state.emergencia);
+        activeTrade = state.activeTrade || null;
+        history = Array.isArray(state.history) ? state.history : [];
+
+    } catch (error) {
+        console.error("No se pudieron recuperar los datos:", error);
+    }
+}
+
 function money(value) {
-
     return "$" + value.toFixed(2);
-
 }
 
 function escribirLog(texto) {
-
     const log = document.getElementById("log");
-
     const hora = new Date().toLocaleTimeString();
 
-    log.innerHTML = "[" + hora + "] " + texto + "<br>" + log.innerHTML;
-
+    log.innerHTML =
+        "[" + hora + "] " +
+        texto +
+        "<br>" +
+        log.innerHTML;
 }
 
 function updateUI() {
-
     document.getElementById("balance").textContent = money(balance);
 
     const pl = document.getElementById("totalPL");
 
-    pl.textContent = (totalPL >= 0 ? "+" : "") + money(totalPL);
+    pl.textContent =
+        (totalPL >= 0 ? "+" : "") + money(totalPL);
 
-    pl.className = "metric-value " + (totalPL >= 0 ? "profit" : "loss");
+    pl.className =
+        "metric-value " +
+        (totalPL >= 0 ? "profit" : "loss");
 
     document.getElementById("closedCount").textContent = closedCount;
 
     document.getElementById("statusText").textContent =
-
         emergencia ? "PARADA DE EMERGENCIA" :
-
         robotActivo ? "Robot activo" : "Robot detenido";
 
     document.getElementById("statusDot").style.background =
-
         emergencia ? "#ff4444" :
-
         robotActivo ? "#50d890" : "#777";
 
     const active = document.getElementById("activeTrade");
 
     if (activeTrade) {
-
         active.innerHTML =
+            "<div class='operation'><span>Par</span><strong>" +
+            activeTrade.pair + "</strong></div>" +
 
-            "<div class='operation'><span>Par</span><strong>" + activeTrade.pair + "</strong></div>" +
+            "<div class='operation'><span>Dirección</span><strong>" +
+            activeTrade.direction + "</strong></div>" +
 
-            "<div class='operation'><span>Dirección</span><strong>" + activeTrade.direction + "</strong></div>" +
+            "<div class='operation'><span>Invertido</span><strong>" +
+            money(activeTrade.amount) + "</strong></div>" +
 
-            "<div class='operation'><span>Invertido</span><strong>" + money(activeTrade.amount) + "</strong></div>" +
+            "<div class='operation'><span>Objetivo de ganancia</span><strong class='profit'>+" +
+            money(activeTrade.amount * 0.10) + "</strong></div>" +
 
-            "<div class='operation'><span>Objetivo de ganancia</span><strong class='profit'>+" + money(activeTrade.amount * 0.10) + "</strong></div>" +
-
-            "<div class='operation'><span>Límite de pérdida</span><strong class='loss'>-" + money(activeTrade.amount * 0.20) + "</strong></div>";
-
+            "<div class='operation'><span>Límite de pérdida</span><strong class='loss'>-" +
+            money(activeTrade.amount * 0.20) + "</strong></div>";
     } else {
-
         active.textContent = "No hay ninguna operación abierta.";
-
     }
 
     document.getElementById("tpBtn").disabled = !activeTrade;
-
     document.getElementById("slBtn").disabled = !activeTrade;
-
-    document.getElementById("openBtn").disabled = !!activeTrade || emergencia;
+    document.getElementById("openBtn").disabled =
+        !!activeTrade || emergencia;
 
     const historyBox = document.getElementById("history");
 
     if (history.length === 0) {
-
         historyBox.textContent = "Todavía no hay operaciones.";
-
     } else {
-
         historyBox.innerHTML = history.map(item =>
-
-            "<div class='operation'><span>" + item.pair + " · " + item.direction +
-
-            "<br><small>" + item.result + " · " + item.time + "</small></span><strong class='" +
-
+            "<div class='operation'><span>" +
+            item.pair + " · " + item.direction +
+            "<br><small>" + item.result + " · " + item.time +
+            "</small></span><strong class='" +
             (item.pl >= 0 ? "profit" : "loss") + "'>" +
-
-            (item.pl >= 0 ? "+" : "") + money(item.pl) + "</strong></div>"
-
+            (item.pl >= 0 ? "+" : "") +
+            money(item.pl) +
+            "</strong></div>"
         ).join("");
-
     }
 
+    saveState();
 }
 
 function startRobot() {
-
     emergencia = false;
-
     robotActivo = true;
 
     escribirLog("Robot activado en modo de simulación.");
-
     updateUI();
-
 }
 
 function stopRobot() {
-
     robotActivo = false;
 
     escribirLog("Robot detenido. Las operaciones abiertas no se cierran automáticamente.");
-
     updateUI();
-
 }
 
 function emergencyStop() {
-
     robotActivo = false;
-
     emergencia = true;
 
     escribirLog("PARADA DE EMERGENCIA. No se pueden abrir nuevas operaciones.");
-
     updateUI();
-
 }
 
 function openTrade() {
-
     if (emergencia) {
-
         escribirLog("No se puede abrir una operación: parada de emergencia activa.");
-
         return;
-
     }
 
     const amount = Number(document.getElementById("amount").value);
 
     if (!Number.isFinite(amount) || amount <= 0) {
-
         alert("Introduce una cantidad válida.");
-
         return;
-
     }
 
     if (amount > balance) {
-
         alert("No tienes suficiente saldo para esta operación.");
-
         return;
-
     }
 
     activeTrade = {
-
         pair: document.getElementById("pair").value,
-
         direction: document.getElementById("direction").value,
-
         amount: amount
-
     };
 
-    escribirLog("Operación simulada abierta en " + activeTrade.pair + " por " + money(amount) + ".");
+    escribirLog(
+        "Operación simulada abierta en " +
+        activeTrade.pair + " por " +
+        money(amount) + "."
+    );
 
     updateUI();
-
 }
 
 function simulateResult(percent) {
-
     if (!activeTrade) return;
 
     const pl = activeTrade.amount * (percent / 100);
 
     balance += pl;
-
     totalPL += pl;
-
     closedCount++;
 
-    const result = percent > 0 ? "Take Profit" : "Stop Loss";
+    const result =
+        percent > 0 ? "Take Profit" : "Stop Loss";
 
     history.unshift({
-
         pair: activeTrade.pair,
-
         direction: activeTrade.direction,
-
         pl: pl,
-
         result: result,
-
-        time: new Date().toLocaleTimeString()
-
+        time: new Date().toLocaleString()
     });
 
-    escribirLog(result + " alcanzado. Resultado simulado: " +
-
-        (pl >= 0 ? "+" : "") + money(pl) + ".");
+    escribirLog(
+        result + " alcanzado. Resultado simulado: " +
+        (pl >= 0 ? "+" : "") + money(pl) + "."
+    );
 
     activeTrade = null;
-
     updateUI();
-
 }
 
 function resetSimulation() {
-
-    if (!confirm("¿Seguro que quieres borrar el historial y reiniciar el capital a $100?")) {
-
+    if (!confirm(
+        "¿Seguro que quieres borrar el historial y reiniciar el capital a $100?"
+    )) {
         return;
-
     }
 
     balance = 100;
-
     totalPL = 0;
-
     closedCount = 0;
-
     robotActivo = false;
-
     emergencia = false;
-
     activeTrade = null;
-
     history = [];
 
-    document.getElementById("log").innerHTML = "Simulación reiniciada.<br>";
+    document.getElementById("log").innerHTML =
+        "Simulación reiniciada.<br>";
 
     escribirLog("Capital restaurado a $100.");
 
     updateUI();
-
 }
 
+// Al abrir la página, recuperar los datos guardados
+loadState();
 updateUI();
+
 
 </script>
 
