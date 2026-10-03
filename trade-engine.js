@@ -76,100 +76,111 @@ const TradeEngine = (() => {
     }
 
     // Activar análisis automático
-    function startAuto(candleProvider, intervalSeconds = 30) {
 
-        if (engineStatus !== "RUNNING") {
-            return {
-                success: false,
-                reason: "Primero debes iniciar el motor."
-            };
-        }
+function startAuto(candleProvider, intervalSeconds = 30) {
 
-        if (typeof candleProvider !== "function") {
-            return {
-                success: false,
-                reason: "No se encontró el proveedor de datos."
-            };
-        }
-
-        stopAuto();
-
-        logDecision(
-            "Análisis automático activado. Intervalo: " +
-            intervalSeconds + " segundos."
-        );
-
-        async function runAnalysis() {
-
-            if (engineStatus !== "RUNNING") {
-                stopAuto();
-                return;
-            }
-
-            for (const pair of pairs) {
-
-                if (engineStatus !== "RUNNING") {
-                    break;
-                }
-
-                try {
-
-                    const candles = await candleProvider(pair);
-
-                    if (!Array.isArray(candles) || candles.length === 0) {
-                        logDecision(
-                            pair + ": no hay datos disponibles."
-                        );
-                        continue;
-                    }
-
-                    analyzePair(pair, candles);
-                    if (typeof updateEngineTest === "function") {
-    updateEngineTest();
-}
-
-                } catch (error) {
-
-    logDecision(
-        "ERROR en " + pair + ": " +
-        error.message
-    );
-
-    if (typeof updateEngineTest === "function") {
-        updateEngineTest();
-    }
-
-    if (typeof escribirLog === "function") {
-        escribirLog(
-            "Error de análisis en " + pair + ": " +
-            error.message
-        );
-    }
-}
-            }
-        }
-
-        runAnalysis();
-
-        autoTimer = setInterval(
-            runAnalysis,
-            intervalSeconds * 1000
-        );
-
+    if (engineStatus !== "RUNNING") {
         return {
-            success: true,
-            message: "Análisis automático activado."
+            success: false,
+            reason: "Primero debes iniciar el motor."
         };
     }
 
-    // Detener análisis automático
-    function stopAuto() {
+    if (typeof candleProvider !== "function") {
+        return {
+            success: false,
+            reason: "No se encontró el proveedor de datos."
+        };
+    }
 
-        if (autoTimer !== null) {
-            clearInterval(autoTimer);
-            autoTimer = null;
+    stopAuto();
+
+    logDecision(
+        "Análisis automático activado. Intervalo: " +
+        intervalSeconds + " segundos."
+    );
+
+    async function runAnalysis() {
+
+        if (engineStatus !== "RUNNING") {
+            stopAuto();
+            return;
+        }
+
+        logDecision("Iniciando nuevo ciclo de análisis.");
+
+        for (const pair of pairs) {
+
+            if (engineStatus !== "RUNNING") {
+                break;
+            }
+
+            try {
+
+                const candles = await candleProvider(pair);
+
+                if (!Array.isArray(candles) || candles.length === 0) {
+
+                    logDecision(
+                        pair + ": no hay datos disponibles."
+                    );
+
+                    continue;
+                }
+
+                const result = analyzePair(pair, candles);
+
+                logDecision(
+                    "Análisis completado para " + pair +
+                    ". Señal: " + result.signal
+                );
+
+                if (typeof updateEngineTest === "function") {
+                    updateEngineTest();
+                }
+
+            } catch (error) {
+
+                logDecision(
+                    "ERROR en " + pair + ": " +
+                    error.message
+                );
+
+                if (typeof escribirLog === "function") {
+                    escribirLog(
+                        "Error de análisis en " + pair +
+                        ": " + error.message
+                    );
+                }
+
+                if (typeof updateEngineTest === "function") {
+                    updateEngineTest();
+                }
+            }
+        }
+
+        logDecision("Ciclo de análisis finalizado.");
+
+        if (typeof updateEngineTest === "function") {
+            updateEngineTest();
         }
     }
+
+    // Ejecutar el primer análisis inmediatamente
+    runAnalysis();
+
+    // Repetir el análisis automáticamente
+    autoTimer = setInterval(
+        runAnalysis,
+        intervalSeconds * 1000
+    );
+
+    return {
+        success: true,
+        message: "Análisis automático activado."
+    };
+}
+
 
     // Registrar resultado de una operación simulada
     function recordResult(profitLoss) {
