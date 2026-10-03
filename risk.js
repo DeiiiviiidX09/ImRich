@@ -10,9 +10,9 @@ const TradeRisk = (() => {
     function createManager() {
 
         const CONFIG = {
-            profitTarget: 0.01,
-            maxLoss: 0.01,
-            leverage: 1
+            profitTarget: 0.002,
+            maxLoss: 0.05,
+            leverage: 30
         };
 
         let cycleStartBalance = 100;
