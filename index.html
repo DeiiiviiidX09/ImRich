@@ -1082,6 +1082,11 @@ function updateEngineTest() {
 
 loadState();
 updateUI();
+
+// Actualizar el panel del motor cada segundo
+setInterval(() => {
+    updateEngineTest();
+}, 1000);
 </script>
 
 </body>
