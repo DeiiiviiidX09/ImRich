@@ -403,6 +403,81 @@ input, select {
 
 <div class="card">
 
+<div class="card">
+
+    <h2>Motor autónomo Trade AI</h2>
+
+    <p class="small">
+        Centro de control y pruebas integradas.
+    </p>
+
+    <div class="metric">
+        <div class="label">Estado del motor</div>
+        <div class="metric-value" id="engineStatus">
+            DETENIDO
+        </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+
+        <div class="metric">
+            <div class="label">Capital del ciclo</div>
+            <div class="metric-value" id="engineBalance">
+                $100.00
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Resultado acumulado</div>
+            <div class="metric-value" id="enginePL">
+                $0.00
+            </div>
+        </div>
+
+    </div>
+
+    <button class="start" onclick="startEngineTest()">
+        INICIAR MOTOR
+    </button>
+
+    <button class="stop" onclick="stopEngineTest()">
+        DETENER MOTOR
+    </button>
+
+    <button class="simulate" onclick="analyzeEngineTest()">
+        ANALIZAR LOS TRES PARES
+    </button>
+
+    <button class="buy" onclick="simulateEngineProfit()">
+        SIMULAR GANANCIA (+$1)
+    </button>
+
+    <button class="sell" onclick="simulateEngineLoss()">
+        SIMULAR PÉRDIDA (-$0.50)
+    </button>
+
+    <button class="reset" onclick="restartEngineTest()">
+        REINICIAR CICLO
+    </button>
+
+    <h3>Señales detectadas</h3>
+
+    <div id="engineSignals" class="log">
+        Esperando análisis.
+    </div>
+
+    <h3>Registro de decisiones</h3>
+
+    <div id="engineLog" class="log">
+        Motor preparado.
+    </div>
+
+    <p class="small">
+        Prueba con datos artificiales. No se ejecutan órdenes reales.
+    </p>
+
+</div>
+
     <h2>Prueba del gestor de riesgo</h2>
 
     <p class="small">
@@ -917,6 +992,134 @@ function resetRiskTest() {
         "Nuevo ciclo iniciado con " +
         money(result.startingBalance) +
         ". La progresión de prueba comienza de nuevo.";
+}
+
+// Iniciar el motor autónomo de prueba
+function startEngineTest() {
+
+    const status = TradeEngine.start(balance);
+
+    updateEngineTest();
+
+    escribirLog("Motor autónomo de prueba iniciado.");
+}
+
+
+// Detener el motor
+function stopEngineTest() {
+
+    TradeEngine.stop();
+
+    updateEngineTest();
+}
+
+
+// Analizar los tres pares
+function analyzeEngineTest() {
+
+    const pairs = [
+        "EUR/USD",
+        "GBP/USD",
+        "USD/JPY"
+    ];
+
+    pairs.forEach(pair => {
+
+        const candles = generateTestCandles(pair);
+
+        TradeEngine.analyzePair(pair, candles);
+
+    });
+
+    updateEngineTest();
+}
+
+
+// Simular una ganancia
+function simulateEngineProfit() {
+
+    TradeEngine.recordResult(1);
+
+    updateEngineTest();
+}
+
+
+// Simular una pérdida
+function simulateEngineLoss() {
+
+    TradeEngine.recordResult(-0.50);
+
+    updateEngineTest();
+}
+
+
+// Reiniciar el ciclo con el capital restante
+function restartEngineTest() {
+
+    const status = TradeEngine.getStatus();
+
+    if (
+        status.engineStatus !== "WAITING" &&
+        status.engineStatus !== "RESTART_REQUIRED"
+    ) {
+        alert("El motor todavía no necesita reiniciar el ciclo.");
+        return;
+    }
+
+    TradeEngine.restartCycle();
+
+    updateEngineTest();
+}
+
+
+// Actualizar la interfaz del motor
+function updateEngineTest() {
+
+    const status = TradeEngine.getStatus();
+    const risk = status.risk;
+
+    document.getElementById("engineStatus").textContent =
+        status.engineStatus;
+
+    document.getElementById("engineBalance").textContent =
+        money(risk.currentBalance);
+
+    const plElement = document.getElementById("enginePL");
+
+    plElement.textContent =
+        (risk.cycleProfitLoss >= 0 ? "+" : "") +
+        money(risk.cycleProfitLoss);
+
+    plElement.className =
+        "metric-value " +
+        (risk.cycleProfitLoss >= 0 ? "profit" : "loss");
+
+
+    // Mostrar señales
+    const signalsBox =
+        document.getElementById("engineSignals");
+
+    const signals = Object.entries(status.lastSignals);
+
+    signalsBox.innerHTML = signals.length
+        ? signals.map(([pair, data]) =>
+            "<div class='operation'><span>" +
+            pair + "</span><strong>" +
+            data.signal + "</strong></div>"
+        ).join("")
+        : "Todavía no hay señales.";
+
+
+    // Mostrar decisiones
+    const logBox =
+        document.getElementById("engineLog");
+
+    logBox.innerHTML = status.decisions.length
+        ? status.decisions.map(item =>
+            "<div>[" + item.time + "] " +
+            item.message + "</div>"
+        ).join("")
+        : "Sin decisiones registradas.";
 }
 
 // Al abrir la página, recuperar los datos guardados
