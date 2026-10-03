@@ -124,6 +124,9 @@ const TradeEngine = (() => {
                     }
 
                     analyzePair(pair, candles);
+                    if (typeof updateEngineTest === "function") {
+    updateEngineTest();
+}
 
                 } catch (error) {
 
