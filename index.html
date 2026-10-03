@@ -757,10 +757,16 @@ function stopRobot() {
 
 
 function emergencyStop() {
+
     robotActivo = false;
     emergencia = true;
 
-    escribirLog("PARADA DE EMERGENCIA. No se pueden abrir nuevas operaciones.");
+    TradeEngine.stop();
+
+    escribirLog(
+        "PARADA DE EMERGENCIA. Motor detenido y nuevas operaciones bloqueadas."
+    );
+
     updateUI();
 }
 
