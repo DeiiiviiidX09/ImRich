@@ -16,8 +16,8 @@ let lifetimeManualLosses = 0;
     let lastCycleEndTime = 0;
     let cooldownMs = 30000;
 
-    const MAX_POSITIONS = 10;
-    const POSITION_FRACTION = 0.10;
+    const MAX_POSITIONS = 20;
+    const POSITION_FRACTION = 0.20;
 
     function log(message, type = "info") {
         const entry = {
@@ -279,19 +279,6 @@ function calculateAllTimeStats() {
                     analysis,
                     opened: false,
                     reason: "No hay señal de entrada."
-                };
-            }
-
-            const alreadyOpen = getCurrentCyclePositions().some(
-                position => position.pair === pair
-            );
-
-            if (alreadyOpen) {
-                return {
-                    success: true,
-                    analysis,
-                    opened: false,
-                    reason: "Ya existe una posición abierta en este par."
                 };
             }
 
