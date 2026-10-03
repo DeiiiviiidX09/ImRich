@@ -1,7 +1,7 @@
 
 /*
  * TRADE AI
- * Gestor de posiciones v1.1
+ * Gestor de posiciones v1.2
  * Simulación exclusivamente.
  * No ejecuta órdenes reales.
  */
@@ -107,6 +107,16 @@ const PositionManager = (() => {
         );
     }
 
+    // Calcular el resultado flotante de todas las posiciones
+    function getTotalUnrealizedProfitLoss() {
+
+        return getOpenPositions().reduce(
+            (total, position) =>
+                total + position.profitLoss,
+            0
+        );
+    }
+
     // Cerrar una posición
     function closePosition(position, reason) {
 
@@ -119,7 +129,7 @@ const PositionManager = (() => {
         position.closedAt = new Date().toISOString();
     }
 
-    // Actualizar precio y comprobar salida
+    // Actualizar precio y comprobar salida individual
     function updatePrice(pair, price) {
 
         if (!Number.isFinite(price) || price <= 0) {
@@ -223,6 +233,7 @@ const PositionManager = (() => {
         getOpenPositions,
         getHistory,
         getTotalMargin,
+        getTotalUnrealizedProfitLoss,
         countOpenPositions,
         reset
     };
