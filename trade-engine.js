@@ -130,11 +130,22 @@ const TradeEngine = (() => {
 
                 } catch (error) {
 
-                    logDecision(
-                        "Error analizando " + pair + ": " +
-                        error.message
-                    );
-                }
+    logDecision(
+        "ERROR en " + pair + ": " +
+        error.message
+    );
+
+    if (typeof updateEngineTest === "function") {
+        updateEngineTest();
+    }
+
+    if (typeof escribirLog === "function") {
+        escribirLog(
+            "Error de análisis en " + pair + ": " +
+            error.message
+        );
+    }
+}
             }
         }
 
