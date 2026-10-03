@@ -666,6 +666,107 @@ function resetSimulation() {
     updateUI();
 }
 
+// Generador de velas artificiales para pruebas
+function generateTestCandles(pair) {
+
+    const basePrices = {
+        "EUR/USD": 1.1000,
+        "GBP/USD": 1.2700,
+        "USD/JPY": 150.00
+    };
+
+    let price = basePrices[pair];
+
+    const candles = [];
+
+    // Crear 100 velas con una tendencia artificial
+    for (let i = 0; i < 100; i++) {
+
+        const trend = Math.sin(i / 12) * 0.0002;
+        const noise = (Math.random() - 0.5) * 0.001;
+
+        const open = price;
+        const close = price + trend + noise;
+
+        const high = Math.max(open, close) +
+            Math.random() * 0.0003;
+
+        const low = Math.min(open, close) -
+            Math.random() * 0.0003;
+
+        candles.push({
+            open: open,
+            high: high,
+            low: low,
+            close: close
+        });
+
+        price = close;
+    }
+
+    return candles;
+}
+
+
+// Ejecutar análisis del mercado
+function analyzeMarket() {
+
+    const pair =
+        document.getElementById("analysisPair").value;
+
+    const candles = generateTestCandles(pair);
+
+    const result = TradeAI.analyze(candles);
+
+    const signalElement =
+        document.getElementById("marketSignal");
+
+    const reasonElement =
+        document.getElementById("signalReason");
+
+    signalElement.textContent = result.signal;
+
+    reasonElement.textContent =
+        result.reason;
+
+    if (result.signal === "BUY") {
+        signalElement.style.color = "#50d890";
+    } else if (result.signal === "SELL") {
+        signalElement.style.color = "#ff6262";
+    } else {
+        signalElement.style.color = "#ffffff";
+    }
+
+    if (result.indicators) {
+
+        document.getElementById("ema20Value").textContent =
+            result.indicators.emaFast.toFixed(5);
+
+        document.getElementById("ema50Value").textContent =
+            result.indicators.emaSlow.toFixed(5);
+
+        document.getElementById("rsiValue").textContent =
+            result.indicators.rsi.toFixed(2);
+
+        document.getElementById("atrValue").textContent =
+            result.indicators.atr.toFixed(5);
+
+    } else {
+
+        document.getElementById("ema20Value").textContent = "--";
+        document.getElementById("ema50Value").textContent = "--";
+        document.getElementById("rsiValue").textContent = "--";
+        document.getElementById("atrValue").textContent = "--";
+
+    }
+
+    escribirLog(
+        "Análisis simulado de " + pair +
+        ": " + result.signal +
+        ". " + result.reason
+    );
+}
+
 // Al abrir la página, recuperar los datos guardados
 loadState();
 updateUI();
