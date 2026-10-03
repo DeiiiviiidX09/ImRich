@@ -15,7 +15,10 @@ const TradeEngine = (() => {
     let decisions = [];
     let autoTimer = null;
     let archivedHistory = [];
+let nextRestartAllowedAt = 0;
+let cycleEndedThisRun = false;
 
+const RESTART_COOLDOWN_MS = 60000;
     const pairs = [
         "EUR/USD",
         "GBP/USD",
