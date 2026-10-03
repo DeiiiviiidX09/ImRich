@@ -368,29 +368,39 @@ input, select {
 
     </div>
 
-    <div class="grid" style="margin-top:12px">
 
-        <div class="metric">
-            <div class="label">EMA 20</div>
-            <div class="metric-value" id="ema20Value">--</div>
+<div class="grid" style="margin-top:12px">
+
+    <div class="metric">
+        <div class="label">Capital del ciclo</div>
+        <div class="metric-value" id="engineBalance">
+            $100.00
         </div>
-
-        <div class="metric">
-            <div class="label">EMA 50</div>
-            <div class="metric-value" id="ema50Value">--</div>
-        </div>
-
-        <div class="metric">
-            <div class="label">RSI</div>
-            <div class="metric-value" id="rsiValue">--</div>
-        </div>
-
-        <div class="metric">
-            <div class="label">ATR</div>
-            <div class="metric-value" id="atrValue">--</div>
-        </div>
-
     </div>
+
+    <div class="metric">
+        <div class="label">Balance neto acumulado</div>
+        <div class="metric-value" id="enginePL">
+            $0.00
+        </div>
+    </div>
+
+    <div class="metric">
+        <div class="label">Ganancias totales</div>
+        <div class="metric-value profit" id="engineWins">
+            $0.00
+        </div>
+    </div>
+
+    <div class="metric">
+        <div class="label">Pérdidas totales</div>
+        <div class="metric-value loss" id="engineLosses">
+            $0.00
+        </div>
+    </div>
+
+</div>
+
 
     <p class="small">
         Los valores mostrados son simulados y no deben utilizarse
@@ -1003,14 +1013,29 @@ function updateEngineTest() {
     document.getElementById("engineBalance").textContent =
         money(risk ? risk.currentBalance : 0);
 
-    const plElement = document.getElementById("enginePL");
-    const cyclePL = status.cycleProfitLoss || 0;
+   
+const stats = status.allTimeStats || {
+    totalWins: 0,
+    totalLosses: 0,
+    netProfitLoss: 0
+};
 
-    plElement.textContent =
-        (cyclePL >= 0 ? "+" : "") + money(cyclePL);
+const plElement = document.getElementById("enginePL");
 
-    plElement.className =
-        "metric-value " + (cyclePL >= 0 ? "profit" : "loss");
+plElement.textContent =
+    (stats.netProfitLoss >= 0 ? "+" : "") +
+    money(stats.netProfitLoss);
+
+plElement.className =
+    "metric-value " +
+    (stats.netProfitLoss >= 0 ? "profit" : "loss");
+
+document.getElementById("engineWins").textContent =
+    "+" + money(stats.totalWins);
+
+document.getElementById("engineLosses").textContent =
+    "-" + money(stats.totalLosses);
+
 
     const signalsBox = document.getElementById("engineSignals");
     const signals = Object.entries(status.lastSignals || {});
@@ -1048,7 +1073,7 @@ function updateEngineTest() {
         : "No hay posiciones abiertas.";
 
     const historyBox = document.getElementById("enginePositionHistory");
-    const positionHistory = status.positionHistory || [];
+    const positionHistory = status.allHistory || [];
 
     historyBox.innerHTML = positionHistory.length
         ? positionHistory.map(position => {
@@ -1058,8 +1083,13 @@ function updateEngineTest() {
                 <div class="operation">
                     <span>
                         <strong>${position.pair}</strong><br>
-                        ${position.direction}<br>
-                        ${position.closeReason || position.status || "Cerrada"}
+                       ${position.direction}<br>
+${position.closeReason || position.status || "Cerrada"}<br>
+<small>
+    ${position.closedAt
+        ? new Date(position.closedAt).toLocaleString()
+        : "Fecha no disponible"}
+</small>
                     </span>
                     <strong class="${pl >= 0 ? "profit" : "loss"}">
                         ${pl >= 0 ? "+" : ""}${money(pl)}
